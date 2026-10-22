@@ -1,0 +1,100 @@
+# 打包发布：push v* tag 自动构建三平台产物并创建草稿 Release；
+# 也可在 Actions 页手动 workflow_dispatch 触发（仅构建，产物挂在本次 run 的 Artifacts 下）。
+# 目标平台见 docs 技术方案 §2-D2：Windows + macOS 双平台，不做 Linux。
+name: 打包发布
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# 创建 Release 需要写权限
+permissions:
+  contents: write
+
+env:
+  # 非 tag 触发（手动）时为空串：tauri-action 检测不到 tagName 就跳过创建 Release
+  RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+
+jobs:
+  build:
+    name: build · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS arm64 原生（补上本机 x86_64 工具链打不出的原生包，方案 §6 遗留项）
+          - os: macos-15
+            target: aarch64-apple-darwin
+          # macOS x86_64（arm64 runner 交叉编译，对本机 x64 产物）
+          - os: macos-15
+            target: x86_64-apple-darwin
+          # Windows x64（bundle.targets: all → MSI + NSIS）
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 工具链版本与本地完全锁定（依赖线按 rustc 1.86 选定，见 Cargo.toml 注释；pnpm 9 = lockfileVersion 9.0），
+      # 禁止在 CI 里隐式升级——等价于远程跑了一次 cargo update。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - name: 校验 tag 与 tauri.conf.json 版本一致
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version=$(jq -r .version src-tauri/tauri.conf.json)
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} 与 tauri.conf.json 版本 ${version} 不一致，先改三处版本号（package.json / tauri.conf.json / Cargo.toml）再打 tag"
+            exit 1
+          fi
+
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 打包并上传到草稿 Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: 植物分身桌面宠物 ${{ env.RELEASE_TAG }}
+          releaseBody: |
+            桌面宠物安装包（未签名）。
+
+            - macOS arm64：Apple Silicon 原生；macOS x64：Intel 原生（Apple Silicon 也可经 Rosetta 运行 x64 包）。挂载 dmg 后将 plant-pet.app 拖入「应用程序」。首次打开若提示“无法验证开发者”，在 app 上右键 →「打开」，或执行 `xattr -cr /Applications/plant-pet.app`。
+            - Windows：msi 与 nsis exe 任选其一；SmartScreen 拦截时点「仍要运行」。
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: false
+          args: --target ${{ matrix.target }}
+
+      - name: 上传构建产物到本次运行（仅手动触发）
+        if: env.RELEASE_TAG == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: plant-pet-${{ matrix.target }}
+          path: |
+            src-tauri/target/**/bundle/dmg/*.dmg
+            src-tauri/target/**/bundle/msi/*.msi
+            src-tauri/target/**/bundle/nsis/*.exe
+          if-no-files-found: error

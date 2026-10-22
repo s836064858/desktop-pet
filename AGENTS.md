@@ -16,6 +16,13 @@ pnpm build          # 类型检查 + 前端构建（交付门禁）
 node scripts/process-sprites.mjs   # 素材切图
 ```
 
+## 发布（.github/workflows/release.yml）
+
+- 发版 = 改三处版本号（`package.json` / `tauri.conf.json` / `Cargo.toml`+`Cargo.lock` 的本包 version）→ 提交后打 tag：`git tag v0.1.0 && git push origin v0.1.0`；tag 与 tauri.conf.json 版本不一致 workflow 会直接失败
+- 三路构建：macOS arm64 原生 + macOS x86_64（交叉编译）+ Windows x64（MSI/NSIS）；CI 工具链锁定 rustc 1.86.0 / pnpm 9 / node 20，与本地一致，勿在 workflow 里放开
+- 产物进**草稿 Release**，人工核对后手动发布；临时试打包走 Actions 页 workflow_dispatch（产物在 run 的 Artifacts，不建 Release）
+- 包未签名：macOS 首次打开右键 →「打开」或 `xattr -cr`；Windows SmartScreen 点「仍要运行」
+
 ## 硬约束（违反即返工）
 
 1. **Rust 零业务代码**：`src-tauri/src/main.rs` 只允许插件注册声明。新系统能力一律优先：官方插件 + `@tauri-apps/api` JS + capability 声明（`src-tauri/capabilities/default.json`）。
