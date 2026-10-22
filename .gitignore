@@ -1,0 +1,12 @@
+node_modules
+dist
+*.local
+
+src-tauri/target
+src-tauri/gen/schemas
+
+# AI 原始生图（68MB，仅本地；切图产物 src/assets/pets 已入库）
+assets-src
+
+scripts/icon-source.png
+.DS_Store

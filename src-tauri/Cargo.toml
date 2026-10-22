@@ -1,0 +1,20 @@
+[package]
+name = "plant-pet"
+version = "0.1.0"
+description = "植物数字分身桌面宠物 · Phase 0 验证"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+# 本机 rustc 1.86（Homebrew）：以下为 crates.io 实测 rust_version ≤1.86 的最新版本线
+# rustc 升级到 ≥1.90 后可放开为 "2"（并解除 Cargo.lock 中 time/uuid 的固定），见 docs 方案 §8-R3
+[dependencies]
+tauri = { version = "=2.11.6", features = ["macos-private-api", "tray-icon"] }
+tauri-plugin-log = "=2.9.2"
+tauri-plugin-notification = "=2.4.0"
+tauri-plugin-process = "=2.3.1"
+tauri-plugin-autostart = "=2.5.1"
+tauri-plugin-sql = { version = "=2.4.1", features = ["sqlite"] }
+tauri-plugin-store = "=2.4.5"
+log = "0.4"

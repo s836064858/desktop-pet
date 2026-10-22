@@ -1,0 +1,32 @@
+{
+  "name": "plant-pet",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "tauri": "tauri",
+    "icon": "node scripts/gen-icon.mjs && tauri icon scripts/icon-source.png"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
+    "@tauri-apps/plugin-log": "^2.9.2",
+    "@tauri-apps/plugin-notification": "^2.4.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-sql": "^2.4.1",
+    "@tauri-apps/plugin-store": "^2.4.5",
+    "element-plus": "^2",
+    "pinia": "^2",
+    "vue": "^3"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@vitejs/plugin-vue": "^5",
+    "typescript": "^5",
+    "vite": "^5",
+    "vue-tsc": "^2"
+  }
+}
