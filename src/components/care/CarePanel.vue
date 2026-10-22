@@ -2,17 +2,28 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCareStore } from '../../stores/care'
-import { SPECIES_LIST } from '../../config/species'
 import { getSpeciesPreviewUrl } from '../../lib/speciesArt'
-import type { SpeciesConfig } from '../../config/species'
+import { listSpeciesCards } from '../../lib/speciesRegistry'
+import type { SpeciesCardItem } from '../../lib/speciesRegistry'
 import type { CareTask, CareTaskStatus, CareTaskType } from '../../lib/database'
+import SpeciesForgeDialog from './SpeciesForgeDialog.vue'
 
 const careStore = useCareStore()
 
-const SPECIES_CARDS = SPECIES_LIST.map((species) => ({
-  ...species,
-  previewUrl: getSpeciesPreviewUrl(species.code),
-}))
+const speciesCards = ref<SpeciesCardItem[]>([])
+const isForgeVisible = ref(false)
+
+async function refreshCards(): Promise<void> {
+  try {
+    speciesCards.value = await listSpeciesCards()
+  } catch (err) {
+    ElMessage.error(`物种列表加载失败：${String(err)}`)
+  }
+}
+
+function onForgeSaved(): void {
+  void refreshCards()
+}
 
 const TYPE_META: Record<CareTaskType, { icon: string, label: string }> = {
   water: { icon: '💧', label: '浇水' },
@@ -33,11 +44,11 @@ const waterIntervalH = ref(72)
 const sunIntervalH = ref(120)
 const isAdopting = ref(false)
 
-const selectedSpecies = computed<SpeciesConfig | undefined>(() =>
-  SPECIES_LIST.find((species) => species.code === selectedCode.value),
+const selectedSpecies = computed<SpeciesCardItem | undefined>(() =>
+  speciesCards.value.find((species) => species.code === selectedCode.value),
 )
 
-function pickSpecies(species: SpeciesConfig): void {
+function pickSpecies(species: SpeciesCardItem): void {
   selectedCode.value = species.code
   waterIntervalH.value = species.waterIntervalH
   sunIntervalH.value = species.sunIntervalH
@@ -94,6 +105,7 @@ function statusTag(status: CareTaskStatus): 'success' | 'warning' | 'danger' | '
 
 onMounted(() => {
   void careStore.init()
+  void refreshCards()
 })
 
 onUnmounted(() => {
@@ -146,10 +158,15 @@ onUnmounted(() => {
     </template>
 
     <div v-else class="adopt">
-      <p class="adopt-tip">还没有领养植物，选一株带回家吧（桌面会生成它的数字分身）：</p>
+      <p class="adopt-tip">
+        还没有领养植物，选一株带回家吧（桌面会生成它的数字分身）：
+        <el-button size="small" type="primary" plain class="adopt-forge" @click="isForgeVisible = true">
+          ✨ AI 生成新物种
+        </el-button>
+      </p>
       <div class="species-grid">
         <button
-          v-for="species in SPECIES_CARDS"
+          v-for="species in speciesCards"
           :key="species.code"
           type="button"
           class="species-card"
@@ -158,7 +175,7 @@ onUnmounted(() => {
         >
           <img v-if="species.previewUrl" class="species-thumb" :src="species.previewUrl" alt="" draggable="false" />
           <span v-else class="species-emoji">{{ species.emoji }}</span>
-          <span class="species-name">{{ species.name }}</span>
+          <span class="species-name">{{ species.name }}<sup v-if="species.isCustom" class="species-badge">AI</sup></span>
           <span class="species-meta">
             💧{{ species.waterIntervalH / 24 }}天 · ☀️{{ species.sunIntervalH / 24 }}天
           </span>
@@ -185,6 +202,7 @@ onUnmounted(() => {
       </div>
       <p v-if="!careStore.isLoaded" class="care-empty">数据加载中…</p>
     </div>
+    <SpeciesForgeDialog v-model="isForgeVisible" @saved="onForgeSaved" />
   </section>
 </template>
 
@@ -225,6 +243,17 @@ onUnmounted(() => {
   margin: 4px 0 10px;
   font-size: 13px;
   color: #606266;
+}
+
+.adopt-forge {
+  margin-left: 8px;
+}
+
+.species-badge {
+  margin-left: 3px;
+  font-size: 9px;
+  color: #409eff;
+  font-weight: 700;
 }
 
 .species-grid {

@@ -15,6 +15,7 @@ export interface AppSettings {
   quietStart: string
   quietEnd: string
   pausedUntil: number | null
+  arkApiKey: string
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -22,6 +23,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   quietStart: '22:00',
   quietEnd: '08:00',
   pausedUntil: null,
+  arkApiKey: '',
 }
 
 export async function readSettings(): Promise<AppSettings> {

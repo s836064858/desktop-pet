@@ -47,5 +47,6 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 
 - plugin-log 必须保持 `.level(Info)`，否则 tao TRACE 日志刷屏
 - dev 端口 5173 被残留进程占用时：`lsof -ti:5173 | xargs kill`
 - pet 窗口热更新会整页重载（`start()` 重跑），验证日志看 `[pet]` 前缀
-- 图生图与文案统一走火山方舟 Ark（`ARK_API_KEY`，标准 HTTP 状态码）；模型/尺寸在 `scripts/sprite-config.json`。ark 图片接口 `watermark` 默认 true、`output_format` 默认 jpeg，`sprite-studio` 已显式覆盖为关水印 + PNG
+- 图生图与文案统一走火山方舟 Ark（`ARK_API_KEY`，标准 HTTP 状态码）；模型/尺寸在 `scripts/sprite-config.json`。ark 图片接口 `watermark` 默认 true、`output_format` 默认 jpeg，脚本与面板均已显式覆盖为关水印 + PNG；衍生帧提示词必须显式拆「脸表情 + 植物状态」两处变化（seedream 参考图服从性强，只写植物状态脸不会动）
+- 面板「AI 生成新物种」：接口走 `tauri-plugin-http`（capability 仅放行 ark 域名），素材库在 `appData/sprite-library/`（`tauri-plugin-fs`，appData 读写），两个插件锁 rustc 1.86 兼容线（http 2.8+/fs 2.7+ 需 Rust 1.90）；自定义物种经 `speciesRegistry` 与内置 4 种合并，`speciesArt` 支持运行时注册帧
 - **`src/assets/pets` 既有帧以仓库现状为准**：龟背竹（happy/sleep/sun）与多肉（happy/sleep/sun/thirsty/water）共 8 帧曾文件名错位、已人工改名修正；全量重跑切图会把错位还原回来覆盖修正。需要重切时用 `node scripts/process-sprites.mjs <species>` 按物种过滤（`sprite-studio commit` 已自带此过滤），不要"顺手"全量重切或按 MAP 修正这 8 帧

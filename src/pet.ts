@@ -28,7 +28,8 @@ import {
   spawnHearts,
   startBlink,
 } from './lib/petView'
-import { hasSpeciesArt } from './lib/speciesArt'
+import { hasSpeciesArt, registerCustomSpeciesFrames } from './lib/speciesArt'
+import { loadCustomSpeciesFrameUrls } from './lib/spriteLibrary'
 import type { BaseState, NeedType, PetViewElements } from './lib/petView'
 
 const SAVE_DELAY_MS = 400
@@ -272,6 +273,7 @@ async function onPlantChanged(): Promise<void> {
     showBubble(view, '先到面板领养一株植物吧（托盘 → 显示面板）')
     return
   }
+  await ensureSpeciesArt(plant.species_code)
   setSpeciesFrames(plant.species_code)
   applySpeciesHue(view, hasSpeciesArt(plant.species_code) ? 0 : hueOfPlant(plant))
   setBaseState(view, currentBaseState)
@@ -335,6 +337,7 @@ async function start() {
   await ensureSchema()
   const plant = await getPlant()
   if (plant) {
+    await ensureSpeciesArt(plant.species_code)
     setSpeciesFrames(plant.species_code)
     if (!hasSpeciesArt(plant.species_code)) {
       applySpeciesHue(view, hueOfPlant(plant))
@@ -358,6 +361,24 @@ async function start() {
 
 function hueOfPlant(plant: Plant): number {
   return SPECIES[plant.species_code]?.hue ?? 0
+}
+
+// 自定义物种（本地资源库）：首次用到时从 appData 读取帧并注册进 speciesArt
+const registeredCustom = new Set<string>()
+async function ensureSpeciesArt(code: string): Promise<void> {
+  if (hasSpeciesArt(code) || registeredCustom.has(code)) {
+    return
+  }
+  try {
+    const frames = await loadCustomSpeciesFrameUrls(code)
+    if (Object.keys(frames).length > 0) {
+      registerCustomSpeciesFrames(code, frames)
+      registeredCustom.add(code)
+      await info(`[pet] 已加载自定义物种帧：${code}`)
+    }
+  } catch (err) {
+    await info(`[pet] 自定义物种帧加载失败（走色相回退）：${String(err)}`)
+  }
 }
 
 start().catch(async (err) => {

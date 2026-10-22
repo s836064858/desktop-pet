@@ -17,6 +17,8 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_fs::init())
         .run(tauri::generate_context!())
         .expect("plant-pet 启动失败");
 }

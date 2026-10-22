@@ -14,9 +14,20 @@ const settings = ref<AppSettings>({
   quietStart: '22:00',
   quietEnd: '08:00',
   pausedUntil: null,
+  arkApiKey: '',
 })
 const isClickThrough = ref(false)
 const isAutostart = ref(false)
+const arkKeyInput = ref('')
+
+async function saveArkKey(): Promise<void> {
+  try {
+    settings.value = await saveSettings({ arkApiKey: arkKeyInput.value.trim() })
+    ElMessage.success('AI 素材密钥已保存')
+  } catch (err) {
+    ElMessage.error(`保存密钥失败：${String(err)}`)
+  }
+}
 
 async function patchSettings(patch: Partial<AppSettings>): Promise<void> {
   try {
@@ -80,6 +91,7 @@ async function confirmReset(): Promise<void> {
 onMounted(async () => {
   try {
     settings.value = await readSettings()
+    arkKeyInput.value = settings.value.arkApiKey
     isClickThrough.value = false
     isAutostart.value = await isAutostartOn()
   } catch (err) {
@@ -124,6 +136,23 @@ onMounted(async () => {
       <div class="settings-item">
         <span class="settings-label">开机自启</span>
         <el-switch :model-value="isAutostart" @change="onChangeAutostart" />
+      </div>
+      <div class="settings-item">
+        <span class="settings-label">
+          AI 素材密钥（火山方舟）
+          <span class="settings-hint">用于 AI 生成新物种；获取：console.volcengine.com/ark</span>
+        </span>
+        <div class="settings-inline">
+          <el-input
+            v-model="arkKeyInput"
+            type="password"
+            show-password
+            size="small"
+            placeholder="ARK_API_KEY"
+            class="settings-key"
+          />
+          <el-button size="small" @click="saveArkKey">保存</el-button>
+        </div>
       </div>
       <div class="settings-item">
         <span class="settings-label">送别当前植物，重新领养</span>
@@ -174,5 +203,15 @@ onMounted(async () => {
 
 .settings-time {
   width: 110px;
+}
+
+.settings-key {
+  width: 220px;
+}
+
+.settings-hint {
+  display: block;
+  font-size: 11px;
+  color: #909399;
 }
 </style>

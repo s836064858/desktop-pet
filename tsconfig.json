@@ -9,6 +9,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "useDefineForClassFields": true
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"]

@@ -26,6 +26,20 @@
     "sql:allow-select",
     "sql:allow-close",
     "store:default",
-    "log:default"
+    "log:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://ark.cn-beijing.volces.com/*" },
+        { "url": "https://*.tos-cn-beijing.volces.com/*" }
+      ]
+    },
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
+    "fs:allow-mkdir",
+    "fs:allow-read-dir",
+    "fs:allow-stat",
+    "fs:allow-exists",
+    "fs:allow-remove"
   ]
 }

@@ -18,3 +18,7 @@ tauri-plugin-autostart = "=2.5.1"
 tauri-plugin-sql = { version = "=2.4.1", features = ["sqlite"] }
 tauri-plugin-store = "=2.4.5"
 log = "0.4"
+# 图生图/文案接口 + 本地素材库（rustc 1.86 兼容线：http 2.8+/fs 2.7+ 需 Rust 1.90，升级前先确认工具链）
+# 注意：Cargo.lock 中 encoding_rs 固定 0.8.33（0.8.42 需 Rust 1.88），reqwest 传递依赖，升级 http 时留意
+tauri-plugin-http = "=2.7.0"
+tauri-plugin-fs = "=2.5.2"
