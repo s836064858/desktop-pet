@@ -1,5 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
+import { Menu } from '@tauri-apps/api/menu'
+import { exit } from '@tauri-apps/plugin-process'
 import { attachConsole, info } from '@tauri-apps/plugin-log'
 import {
   readAffection,
@@ -7,6 +9,7 @@ import {
   saveAffection,
   savePetPosition,
   sendTaskNotification,
+  showPanelWindow,
 } from './lib/capabilities'
 import { completeTask, ensureSchema, getPlant, getStageFromCount, getTotalCompletedCount } from './lib/database'
 import type { CareResult, CareTaskType, Plant } from './lib/database'
@@ -77,6 +80,7 @@ let stageIndex = 0
 let currentBaseState: BaseState = 'idle'
 let unlistenPlantChanged: (() => void) | null = null
 let view: PetViewElements | null = null
+let petContextMenu: Menu | null = null
 const stroke: StrokeState = { isActive: false, lastX: 0, direction: 0, turns: 0, isTriggered: false }
 
 function pickRandom(lines: string[]): string {
@@ -110,6 +114,9 @@ function triggerPoked(): void {
 }
 
 function onPettablePointerDown(event: PointerEvent): void {
+  if (event.button !== 0) {
+    return
+  }
   stroke.isActive = true
   stroke.lastX = event.clientX
   stroke.direction = 0
@@ -148,6 +155,36 @@ function onPettableClick(): void {
   triggerPoked()
 }
 
+async function ensurePetContextMenu(): Promise<Menu> {
+  if (petContextMenu === null) {
+    petContextMenu = await Menu.new({
+      items: [
+        {
+          id: 'show-panel',
+          text: '显示面板',
+          action: () => {
+            void showPanelWindow()
+          },
+        },
+        { item: 'Separator' },
+        {
+          id: 'quit',
+          text: '退出',
+          action: () => {
+            void exit(0)
+          },
+        },
+      ],
+    })
+  }
+  return petContextMenu
+}
+
+function onWindowContextMenu(event: MouseEvent): void {
+  event.preventDefault()
+  void ensurePetContextMenu().then((menu) => menu.popup())
+}
+
 function initGestures(): void {
   if (!view) {
     return
@@ -158,6 +195,7 @@ function initGestures(): void {
   }
   window.addEventListener('pointermove', onWindowPointerMove)
   window.addEventListener('pointerup', onWindowPointerUp)
+  window.addEventListener('contextmenu', onWindowContextMenu)
 }
 
 function teardownGestures(): void {
@@ -170,6 +208,7 @@ function teardownGestures(): void {
   }
   window.removeEventListener('pointermove', onWindowPointerMove)
   window.removeEventListener('pointerup', onWindowPointerUp)
+  window.removeEventListener('contextmenu', onWindowContextMenu)
 }
 
 async function syncStage(): Promise<void> {
