@@ -18,7 +18,7 @@ node scripts/process-sprites.mjs   # 素材切图
 
 ## 发布（.github/workflows/release.yml）
 
-- 发版 = 改三处版本号（`package.json` / `tauri.conf.json` / `Cargo.toml`+`Cargo.lock` 的本包 version）→ 提交后打 tag：`git tag v0.1.0 && git push origin v0.1.0`；tag 与 tauri.conf.json 版本不一致 workflow 会直接失败
+- 一键发版：`pnpm release 0.2.0`（同步四处版本号 package.json / tauri.conf.json / Cargo.toml / Cargo.lock → `pnpm build` 门禁 → 提交推送 main → 打 tag 触发打包）；`pnpm release`（无参数）= 版本号已改好时只补打 tag；加 `--dry-run` 预演不落盘。脚本为 `scripts/release.mjs`，Rust 侧编译由 CI 验证
 - 三路构建：macOS arm64 原生 + macOS x86_64（交叉编译）+ Windows x64（MSI/NSIS）；CI 工具链锁定 rustc 1.86.0 / pnpm 9 / node 20，与本地一致，勿在 workflow 里放开
 - 产物进**草稿 Release**，人工核对后手动发布；临时试打包走 Actions 页 workflow_dispatch（产物在 run 的 Artifacts，不建 Release）
 - 包未签名：macOS 首次打开右键 →「打开」或 `xattr -cr`；Windows SmartScreen 点「仍要运行」
