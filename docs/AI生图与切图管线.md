@@ -8,7 +8,7 @@
 
 - **已入库**：绿萝 / 龟背竹 / 多肉 / 仙人球 × 6 帧（idle / happy / thirsty / water / sun / sleep）= 24 帧，位于 `src/assets/pets/{code}/stage0/`
 - **风格基准**：Q 版卡通、粗黑描边、平涂糖果色、赛璐璐阴影；角色 = 陶土色圆花盆作身体（脸+腮红+小手小脚）+ 头顶物种植物
-- **工具链**：AI 生图（即梦等，参考图模式）→ `assets-src/{物种}/` → `scripts/process-sprites.mjs` → `src/assets/pets/`（全链路零外部依赖）
+- **工具链**：AI 生图（`pnpm sprite`：火山方舟 Ark 图生图，见《生图自动化脚本设计.md》；备选即梦参考图模式）→ `assets-src/{物种}/` → `scripts/process-sprites.mjs` → `src/assets/pets/`（全链路零外部依赖）
 
 ---
 
@@ -64,7 +64,7 @@ PNG 解码（RGB/RGBA 8bit 非隔行）
 { dir: '龟背竹', file: '52design-xxx.png', species: 'monstera', name: 'idle1' }
 ```
 
-**新物种/新帧操作**：往 MAP 加条目 → `node scripts/process-sprites.mjs` → 完成。
+**新物种/新帧操作**：往 MAP 加条目 → `node scripts/process-sprites.mjs` → 完成；`pnpm sprite commit` 会生成 `assets-src/{dir}/map.json` 并被脚本自动合并（效果等同）。
 
 **已知特性**：脚下的浅色地面阴影会保留（起"落地"作用）；状态帧里 AI 画的道具（水滴/太阳/爱心）随帧保留。
 

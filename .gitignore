@@ -10,3 +10,6 @@ assets-src
 
 scripts/icon-source.png
 .DS_Store
+
+# sprite-studio：zeakai 生图/聊天接口密钥
+.env

@@ -1,5 +1,5 @@
 import { deflateSync, inflateSync } from 'node:zlib'
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -39,6 +39,24 @@ const MAP = [
   { dir: '仙人球', file: '52design-free-creation-free-media-5d4e1e4abb304863806ed26b200c4be4-1792647307082.png', species: 'cactus', name: 'sun1' },
   { dir: '仙人球', file: '52design-free-creation-free-media-eada6f193d9349bc9d4f46718a462593-1792647314250.png', species: 'cactus', name: 'sleep1' },
 ]
+
+// 合并各物种 assets-src/{dir}/map.json（由 scripts/sprite-studio.mjs commit 生成；设计见 docs/生图自动化脚本设计.md §6）
+if (existsSync(SRC_DIR)) {
+  for (const ent of readdirSync(SRC_DIR, { withFileTypes: true })) {
+    if (!ent.isDirectory()) continue
+    const mapFile = resolve(SRC_DIR, ent.name, 'map.json')
+    if (!existsSync(mapFile)) continue
+    let parsed
+    try {
+      parsed = JSON.parse(readFileSync(mapFile, 'utf8'))
+    } catch (e) {
+      throw new Error(`解析 ${mapFile} 失败：${e.message}`)
+    }
+    for (const [name, file] of Object.entries(parsed.frames || {})) {
+      MAP.push({ dir: ent.name, file, species: parsed.species, name })
+    }
+  }
+}
 
 const CRC_TABLE = new Uint32Array(256)
 for (let n = 0; n < 256; n++) {
@@ -240,7 +258,11 @@ function resizeBilinear(rgba, width, height, target) {
   return out
 }
 
+// 支持按物种过滤：既有物种 stage0 里有手工改名修正的帧（见 AGENTS.md 已知坑），全量重切会覆盖掉修正
+const ONLY = process.argv.slice(2)
+
 for (const { dir, file, species, name } of MAP) {
+  if (ONLY.length && !ONLY.includes(species)) continue
   const { width, height, rgba } = decodePng(readFileSync(resolve(SRC_DIR, dir, file)))
   removeWhiteBackground(rgba, width, height)
   featherEdges(rgba, width, height)
@@ -250,4 +272,4 @@ for (const { dir, file, species, name } of MAP) {
   writeFileSync(resolve(outDir, `${name}.png`), encodePng(out, TARGET, TARGET))
   console.log(`${species}/${name}.png  <-  ${dir}/${file} (${width}x${height})`)
 }
-console.log(`done -> ${OUT_DIR}`)
+console.log(`done -> ${OUT_DIR}${ONLY.length ? `（仅 ${ONLY.join('、')}）` : ''}`)

@@ -9,7 +9,8 @@
     "typecheck": "vue-tsc --noEmit",
     "tauri": "tauri",
     "icon": "node scripts/gen-icon.mjs && tauri icon scripts/icon-source.png",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "sprite": "node scripts/sprite-studio.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

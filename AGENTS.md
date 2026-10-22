@@ -4,8 +4,9 @@
 
 ## 必读文档
 
-- [docs/技术方案-植物数字分身桌面宠物.md](docs/技术方案-植物数字分身桌面宠物.md)：业务流程、分期规划、决策记录（§2 D1~D10）
+- [docs/技术方案-植物数字分身桌面宠物.md](docs/技术方案-植物数字分身桌面宠物.md)：业务流程、分期规划、决策记录（§2 D1~D14）
 - [docs/AI生图与切图管线.md](docs/AI生图与切图管线.md)：素材入库唯一流程
+- [docs/生图自动化脚本设计.md](docs/生图自动化脚本设计.md)：素材生图自动化（`pnpm sprite`：probe/ask/gen/commit）
 
 ## 命令
 
@@ -14,6 +15,7 @@ pnpm tauri dev      # 开发运行
 pnpm typecheck      # 类型检查（交付前必须）
 pnpm build          # 类型检查 + 前端构建（交付门禁）
 node scripts/process-sprites.mjs   # 素材切图
+pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 SPRITE_API_KEY）
 ```
 
 ## 发布（.github/workflows/release.yml）
@@ -45,3 +47,5 @@ node scripts/process-sprites.mjs   # 素材切图
 - plugin-log 必须保持 `.level(Info)`，否则 tao TRACE 日志刷屏
 - dev 端口 5173 被残留进程占用时：`lsof -ti:5173 | xargs kill`
 - pet 窗口热更新会整页重载（`start()` 重跑），验证日志看 `[pet]` 前缀
+- 图生图与文案统一走火山方舟 Ark（`ARK_API_KEY`，标准 HTTP 状态码）；模型/尺寸在 `scripts/sprite-config.json`。ark 图片接口 `watermark` 默认 true、`output_format` 默认 jpeg，`sprite-studio` 已显式覆盖为关水印 + PNG
+- **`src/assets/pets` 既有帧以仓库现状为准**：龟背竹（happy/sleep/sun）与多肉（happy/sleep/sun/thirsty/water）共 8 帧曾文件名错位、已人工改名修正；全量重跑切图会把错位还原回来覆盖修正。需要重切时用 `node scripts/process-sprites.mjs <species>` 按物种过滤（`sprite-studio commit` 已自带此过滤），不要"顺手"全量重切或按 MAP 修正这 8 帧

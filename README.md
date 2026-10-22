@@ -29,14 +29,27 @@ pnpm tauri dev     # 开发运行（秒级启动）
 pnpm tauri build   # 打包安装包（.app / .dmg / 平台安装包）
 ```
 
-| 命令 | 说明 |
-|---|---|
-| `pnpm tauri dev` | 开发模式运行 |
-| `pnpm tauri build` | 打包 |
-| `pnpm typecheck` | vue-tsc 类型检查 |
-| `pnpm build` | 类型检查 + 前端构建（质量门禁） |
-| `pnpm icon` | 重新生成应用图标 |
-| `node scripts/process-sprites.mjs` | 素材切图管线（AI 生图 → 程序资产） |
+| 命令                                    | 说明                                       |
+| --------------------------------------- | ------------------------------------------ |
+| `pnpm tauri dev`                        | 开发模式运行                               |
+| `pnpm tauri build`                      | 打包                                       |
+| `pnpm typecheck`                        | vue-tsc 类型检查                           |
+| `pnpm build`                            | 类型检查 + 前端构建（质量门禁）            |
+| `pnpm icon`                             | 重新生成应用图标                           |
+| `node scripts/process-sprites.mjs`      | 素材切图管线（AI 生图 → 程序资产）         |
+| `pnpm sprite <probe\|ask\|gen\|commit>` | 素材生图自动化（需 `.env` 配置密钥，见下） |
+
+### 素材生图自动化（可选）
+
+新增植物物种的素材可由 `pnpm sprite` 半自动生成：AI 起草物种文案 → AI 生成 6 帧候选 → 人工目检定稿 → 切图入库。密钥为火山方舟 Ark 的 API Key，填入仓库根 `.env`（模板见 `.env.example`，该文件不入库）：
+
+```bash
+ARK_API_KEY=你的密钥   # 图生图 + 文案（火山方舟 Ark）：到 https://console.volcengine.com/ark/region:cn-beijing/apiKey?apikey=%7B%7D 创建 API Key
+```
+
+图生图模型与尺寸可在 `scripts/sprite-config.json` 调整。
+
+设计与流程闸门详见《[生图自动化脚本设计](docs/生图自动化脚本设计.md)》；不加密钥不影响应用本身的使用。
 
 ## 目录结构
 
@@ -45,6 +58,7 @@ pnpm tauri build   # 打包安装包（.app / .dmg / 平台安装包）
 ├─ assets-src/            # AI 生成的原始图（按物种分目录，不入包）
 ├─ scripts/
 │  ├─ process-sprites.mjs # 切图管线：抠底/羽化/归一化 → src/assets/pets
+│  ├─ sprite-studio.mjs   # 素材生图自动化：probe/ask/gen/commit
 │  └─ gen-icon.mjs        # 占位图标生成
 ├─ src/
 │  ├─ config/species.ts   # 物种库（习性间隔配置）
@@ -61,10 +75,11 @@ pnpm tauri build   # 打包安装包（.app / .dmg / 平台安装包）
 
 - [技术方案](docs/技术方案-植物数字分身桌面宠物.md) —— 选型、业务流程、分期规划、决策记录
 - [AI 生图与切图管线](docs/AI生图与切图管线.md) —— 提示词结构、一致性方法、素材入库流程
+- [生图自动化脚本设计](docs/生图自动化脚本设计.md) —— sprite-studio：接口适配、流程闸门、密钥获取
 
 ## 平台状态
 
-| 平台 | 状态 |
-|---|---|
+| 平台                         | 状态                                                                 |
+| ---------------------------- | -------------------------------------------------------------------- |
 | macOS（Intel/Apple Silicon） | ✅ 已验证；当前产物为 x64（AS 走 Rosetta），arm64 原生包待工具链就绪 |
-| Windows | ⏳ 待验证（Phase 1 剩余项） |
+| Windows                      | ⏳ 待验证（Phase 1 剩余项）                                          |
