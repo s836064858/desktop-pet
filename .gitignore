@@ -12,3 +12,6 @@ assets-src
 
 # sprite-studio：火山方舟 Ark 生图/文案接口密钥
 .env
+
+# 本地维护文档：保留本机文件，不纳入后续提交
+/docs/

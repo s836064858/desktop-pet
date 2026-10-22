@@ -2,12 +2,14 @@
 
 芽伴 · Sproutkin，植物数字分身桌面宠物（Tauri 2 + Vue3）。个人代码规范见 `~/AGENTS.md`，本文件是**项目特有**的约定，冲突时以本文件为准。
 
-## 必读文档
+## 本地维护文档
 
-- [docs/技术方案-植物数字分身桌面宠物.md](docs/技术方案-植物数字分身桌面宠物.md)：业务流程、分期规划、决策记录（§2 D1~D14）
-- [docs/AI生图与切图管线.md](docs/AI生图与切图管线.md)：素材入库唯一流程
-- [docs/生图自动化脚本设计.md](docs/生图自动化脚本设计.md)：素材生图自动化（`pnpm sprite`：probe/ask/gen/commit）
-- [docs/branding/品牌规范.md](docs/branding/品牌规范.md)：正式品牌名称与 v2 Logo 使用约定
+`docs/` 仅在维护者本机保留，已取消 Git 跟踪并加入忽略规则。禁止强制添加、提交或上传该目录。新克隆仓库不包含这些文件，以本文件与 README 为协作依据；本地文档存在时，修改相关模块前应阅读对应内容：
+
+- `docs/技术方案-植物数字分身桌面宠物.md`：业务流程、分期规划、决策记录。
+- `docs/AI生图与切图管线.md`：植物素材入库流程。
+- `docs/生图自动化脚本设计.md`：素材生图自动化（`pnpm sprite`：probe/ask/gen/commit）。
+- `docs/branding/品牌规范.md`：正式品牌名称与 v2 Logo 使用约定。
 
 ## 命令
 

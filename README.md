@@ -63,7 +63,6 @@ pnpm tauri dev
 - 采用 **v2 圆角 Y 字母标**，表达相伴与成长，与植物宠物角色分离。
 - 正式原图：[src/assets/brand/logo.png](src/assets/brand/logo.png)；名称常量：[src/config/brand.ts](src/config/brand.ts)。
 - 面板、HTML 图标、README 与 `pnpm icon` 共用正式原图；更新原图后执行 `pnpm icon`，仅将 Tauri 配置引用的 macOS / Windows 图标写入 `src-tauri/icons/`。
-- 名称、Logo 与使用约定见 [品牌规范](docs/branding/品牌规范.md)。
 
 品牌更新保留原应用标识 `com.desktoppet.plantpet`、数据库 `plant-pet.db` 与配置文件 `phase0.json`，以继续使用已有领养、积分、设置和本地素材库。仓库地址仍为 `desktop-pet`。
 
@@ -85,14 +84,13 @@ pnpm sprite gen --species lavender --all
 pnpm sprite commit --species lavender
 ```
 
-`lavender` 仅为示例，实际使用 `ask` 生成并写入的物种 code。入库前必须逐帧目检；养护参数由人工确认，按命令输出补齐配置。模型与尺寸见 `scripts/sprite-config.json`，流程闸门见 [生图自动化脚本设计](docs/生图自动化脚本设计.md)。不配置密钥也可使用内置植物与全部基础养护功能。
+`lavender` 仅为示例，实际使用 `ask` 生成并写入的物种 code。入库前必须逐帧目检；养护参数由人工确认，按命令输出补齐配置。模型与尺寸见 `scripts/sprite-config.json`。不配置密钥也可使用内置植物与全部基础养护功能。
 
 ## 架构与目录
 
 双窗口：`pet` 常驻宠物窗承载调度与互动，`main` 面板管理领养与设置；通过 `care-changed` / `plant-changed` 事件同步。Rust 侧仅做插件注册，业务逻辑在 TypeScript 前端。
 
 ```text
-├─ docs/                  # 技术方案、素材管线与品牌说明
 ├─ assets-src/            # 植物原始生图（本地，不入包）
 ├─ scripts/
 │  ├─ process-sprites.mjs # 按物种切图与归一化
@@ -112,11 +110,8 @@ pnpm sprite commit --species lavender
 └─ pet.html               # 透明宠物窗页面
 ```
 
-## 文档与发布
-
-- [技术方案](docs/技术方案-植物数字分身桌面宠物.md)：业务流程、分期规划与决策记录。
-- [AI 生图与切图管线](docs/AI生图与切图管线.md)：植物素材提示词、一致性与入库流程。
-- [生图自动化脚本设计](docs/生图自动化脚本设计.md)：CLI 与面板 AI 生成实现。
-- [品牌规范](docs/branding/品牌规范.md)：正式名称、Logo 与使用约定。
+## 发布与本地文档
 
 发布工作流构建 macOS Apple Silicon、macOS Intel 与 Windows x64 三路产物。tag 触发后创建草稿 Release，人工核对后发布；也可手动触发 Actions，仅上传构建产物。macOS 已完成本机验证，Windows 安装与运行仍需真机验收。
+
+维护过程、技术方案与生成记录仅保存在本机 `docs/`，不随仓库分发；该目录已取消 Git 跟踪并加入 `.gitignore`，后续文档变更不会上传。
