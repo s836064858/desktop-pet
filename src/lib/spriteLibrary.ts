@@ -20,11 +20,6 @@ export interface SpeciesLibrary {
   species: Record<string, CustomSpeciesMeta>
 }
 
-interface LibraryFile {
-  frames: Partial<Record<FrameName, string>>
-  meta: CustomSpeciesMeta
-}
-
 const EMPTY_LIBRARY: SpeciesLibrary = { version: 1, species: {} }
 const urlCache = new Map<string, string>()
 

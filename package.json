@@ -1,5 +1,6 @@
 {
-  "name": "plant-pet",
+  "name": "sproutkin",
+  "description": "芽伴 · Sproutkin：植物养护与桌面陪伴",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,7 +9,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "tauri": "tauri",
-    "icon": "node scripts/gen-icon.mjs && tauri icon scripts/icon-source.png",
+    "icon": "node scripts/gen-icon.mjs",
     "release": "node scripts/release.mjs",
     "sprite": "node scripts/sprite-studio.mjs"
   },

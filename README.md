@@ -1,85 +1,122 @@
-# 植物分身 · 桌面宠物
+<p align="center">
+  <img src="src/assets/brand/logo.png" alt="芽伴 Sproutkin Logo" width="96" height="96" />
+</p>
 
-> 公司/园区「绿植领养活动」的桌面配套工具：领养真实植物后，在桌面养一株对应的卡通数字分身；按植物习性提醒浇水、晒太阳，线下照护后回到桌面互动打卡，积累积分兑换线下权益。
+# 芽伴 · Sproutkin
+
+> 桌上有芽，日常有伴。
+
+芽伴是公司 / 园区绿植领养活动的桌面配套应用：领养真实植物后，在桌面养一株对应的卡通数字分身，按植物习性提醒浇水、晒太阳，照护后通过桌面互动打卡、积累积分。
 
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue) ![stack](https://img.shields.io/badge/Tauri%202-Vue3-42b883)
 
+本期仅支持 macOS 与 Windows，不包含 iOS / Android 移动端。
+
 ## 功能
 
-- **数字分身**：领养物种生成专属卡通分身（绿萝 / 龟背竹 / 多肉 / 仙人球），常驻桌面，可拖拽、可抚摸、会眨眼
-- **养护提醒**：按物种习性调度浇水/晒太阳任务，到期系统通知 + 分身头顶悬浮 💧/☀️ 按钮（平时隐藏，到期高亮脉冲）
-- **互动即打卡**：随时可浇水/晒太阳，计分看时机——提前 +8 / 按时 +10 / 逾期补做 +5，每日积分上限 20 防刷
-- **养成体系**：积分流水（只记流水可审计）、好感度（抚摸+互动）、连击 streak、完全体阶段（累计完成 30 次）
-- **面板**：我的植物（任务列表/稍后/积分）+ 设置（免打扰时段/鼠标穿透/开机自启/重新领养）；关闭即隐藏，托盘常驻
-- **纯单机**：零网络依赖，数据本地 SQLite
+- **桌面伙伴**：内置绿萝、龟背竹、多肉、仙人球、狗尾巴草，支持拖拽、抚摸、眨眼与表情反馈。
+- **养护提醒**：按物种习性调度浇水 / 晒太阳任务，到期通过系统通知与宠物气泡提醒；悬浮宠物可显示养护按钮，到期按钮高亮。
+- **互动即打卡**：随时可浇水 / 晒太阳，提前完成 +8、按时完成 +10、逾期补做 +5；每日互动积分上限 20，无待办任务时互动不计分。
+- **共同成长**：好感度、连续打卡与积分流水；累计完成 30 次养护后进入完全体阶段。
+- **管理面板**：领养、任务列表、稍后提醒、免打扰、鼠标穿透、开机自启与重新领养；关闭面板时隐藏，托盘可再次唤起。
+- **AI 新物种（可选）**：在面板中输入物种名称、编辑 AI 文案、生成并预览六种状态帧，确认后加入本机素材库。
+- **本地优先**：养护、积分与设置保存在本机，基础功能可离线使用；仅可选 AI 生成功能需要联网调用火山方舟。
 
-## 技术栈
+## 开始使用
 
-Tauri 2 · Vue3 `<script setup>` + TypeScript · Vite · Pinia · Element Plus · SQLite（tauri-plugin-sql）
+从仓库的 [Releases](https://github.com/s836064858/desktop-pet/releases) 下载对应平台安装包。
 
-架构要点：双窗口（`pet` 常驻宠物窗承载调度器与互动 / `main` 面板窗），窗口间经 `care-changed` / `plant-changed` 事件同步；Rust 侧仅插件注册声明，业务逻辑全部在 TS。
+1. 安装并启动 **Sproutkin**，通过托盘打开芽伴面板。
+2. 选择植物、填写昵称并确认养护间隔，点击「领养」。
+3. 在桌面伙伴上悬浮显示 💧 / ☀️，点击完成对应养护；抚摸或拖动花盆与它互动。
+4. 在面板查看任务与积分，并按需开启开机自启、免打扰等设置。
 
-## 快速开始
+当前安装包未签名：macOS 挂载 DMG 后将 `Sproutkin.app` 拖入「应用程序」，首次打开可右键 →「打开」；必要时执行 `xattr -cr /Applications/Sproutkin.app`。Windows 遇到 SmartScreen 提示时选择「仍要运行」。
 
-环境要求：Node 22+、pnpm 10+、Rust stable（依赖版本已锁定，详见 AGENTS.md 约束）
+积分兑换线下权益由活动方另行组织，当前应用仅提供本地积分记录。
 
-```bash
-pnpm install
-pnpm tauri dev     # 开发运行（秒级启动）
-pnpm tauri build   # 打包安装包（.app / .dmg / 平台安装包）
-```
+## 本地开发
 
-| 命令                                    | 说明                                       |
-| --------------------------------------- | ------------------------------------------ |
-| `pnpm tauri dev`                        | 开发模式运行                               |
-| `pnpm tauri build`                      | 打包                                       |
-| `pnpm typecheck`                        | vue-tsc 类型检查                           |
-| `pnpm build`                            | 类型检查 + 前端构建（质量门禁）            |
-| `pnpm icon`                             | 重新生成应用图标                           |
-| `node scripts/process-sprites.mjs`      | 素材切图管线（AI 生图 → 程序资产）         |
-| `pnpm sprite <probe\|ask\|gen\|commit>` | 素材生图自动化（需 `.env` 配置密钥，见下） |
+技术栈：Tauri 2 · Vue 3 `<script setup>` + TypeScript · Vite · Pinia · Element Plus · SQLite。
 
-### 素材生图自动化（可选）
-
-新增植物物种的素材可由 `pnpm sprite` 半自动生成：AI 起草物种文案 → AI 生成 6 帧候选 → 人工目检定稿 → 切图入库。密钥为火山方舟 Ark 的 API Key，填入仓库根 `.env`（模板见 `.env.example`，该文件不入库）：
+CI 固定使用 Node 20、pnpm 9、Rust 1.86.0；本地 Node 20+、pnpm 9+。Rust 与 Tauri 依赖已锁定在兼容线，不升级依赖、不执行 `cargo update`，具体约束见 [AGENTS.md](AGENTS.md)。
 
 ```bash
-ARK_API_KEY=你的密钥   # 图生图 + 文案（火山方舟 Ark）：到 https://console.volcengine.com/ark/region:cn-beijing/apiKey?apikey=%7B%7D 创建 API Key
+pnpm install --frozen-lockfile
+pnpm tauri dev
 ```
 
-图生图模型与尺寸可在 `scripts/sprite-config.json` 调整。
+| 命令                                         | 说明                                                   |
+| -------------------------------------------- | ------------------------------------------------------ |
+| `pnpm tauri dev`                             | 启动桌面开发环境                                       |
+| `pnpm typecheck`                             | Vue / TypeScript 类型检查                              |
+| `pnpm build`                                 | 类型检查与前端构建，交付门禁                           |
+| `pnpm tauri build`                           | 打包当前平台安装包                                     |
+| `pnpm icon`                                  | 从正式 v2 Logo 生成 macOS / Windows 桌面图标           |
+| `pnpm release 0.2.0`                         | 同步版本、构建、提交推送并打 tag；产物进入草稿 Release |
+| `node scripts/process-sprites.mjs <species>` | 按物种切图，避免覆盖其他物种已修正帧                   |
+| `pnpm sprite <probe\|ask\|gen\|commit>`      | 素材生图自动化，需配置密钥                             |
 
-设计与流程闸门详见《[生图自动化脚本设计](docs/生图自动化脚本设计.md)》；不加密钥不影响应用本身的使用。
+### 品牌与图标
 
-## 目录结构
+- 中文名称：**芽伴**；英文名称与安装包名称：**Sproutkin**。
+- 采用 **v2 圆角 Y 字母标**，表达相伴与成长，与植物宠物角色分离。
+- 正式原图：[src/assets/brand/logo.png](src/assets/brand/logo.png)；名称常量：[src/config/brand.ts](src/config/brand.ts)。
+- 面板、HTML 图标、README 与 `pnpm icon` 共用正式原图；更新原图后执行 `pnpm icon`，仅将 Tauri 配置引用的 macOS / Windows 图标写入 `src-tauri/icons/`。
+- 名称、Logo 与使用约定见 [品牌规范](docs/branding/品牌规范.md)。
 
+品牌更新保留原应用标识 `com.desktoppet.plantpet`、数据库 `plant-pet.db` 与配置文件 `phase0.json`，以继续使用已有领养、积分、设置和本地素材库。仓库地址仍为 `desktop-pet`。
+
+从旧名版本升级时，先关闭旧程序，再启动 Sproutkin。若旧版已开启开机自启，请先在旧版关闭，再在新版重新开启，以更新系统启动项名称与安装路径。
+
+### AI 素材生成（可选）
+
+面板入口：「AI 生成新物种」。先在设置中配置火山方舟密钥，再按向导完成物种文案、六帧生成、逐帧预览与确认入库；自定义物种保存在本机应用数据目录的 `sprite-library/`。
+
+CLI 入口：在仓库根目录的 `.env` 中配置密钥（参照 `.env.example`，不要提交密钥）：
+
+```bash
+ARK_API_KEY=你的密钥
 ```
-├─ docs/                  # 技术方案、AI 生图与切图管线
-├─ assets-src/            # AI 生成的原始图（按物种分目录，不入包）
+
+```bash
+pnpm sprite ask 薰衣草 --write
+pnpm sprite gen --species lavender --all
+pnpm sprite commit --species lavender
+```
+
+`lavender` 仅为示例，实际使用 `ask` 生成并写入的物种 code。入库前必须逐帧目检；养护参数由人工确认，按命令输出补齐配置。模型与尺寸见 `scripts/sprite-config.json`，流程闸门见 [生图自动化脚本设计](docs/生图自动化脚本设计.md)。不配置密钥也可使用内置植物与全部基础养护功能。
+
+## 架构与目录
+
+双窗口：`pet` 常驻宠物窗承载调度与互动，`main` 面板管理领养与设置；通过 `care-changed` / `plant-changed` 事件同步。Rust 侧仅做插件注册，业务逻辑在 TypeScript 前端。
+
+```text
+├─ docs/                  # 技术方案、素材管线与品牌说明
+├─ assets-src/            # 植物原始生图（本地，不入包）
 ├─ scripts/
-│  ├─ process-sprites.mjs # 切图管线：抠底/羽化/归一化 → src/assets/pets
-│  ├─ sprite-studio.mjs   # 素材生图自动化：probe/ask/gen/commit
-│  └─ gen-icon.mjs        # 占位图标生成
+│  ├─ process-sprites.mjs # 按物种切图与归一化
+│  ├─ sprite-studio.mjs   # 素材文案与生图自动化
+│  ├─ gen-icon.mjs        # 仅更新配置引用的桌面图标
+│  └─ release.mjs         # 版本同步与发布
 ├─ src/
-│  ├─ config/species.ts   # 物种库（习性间隔配置）
-│  ├─ lib/                # database / scheduler / capabilities / petView / speciesArt
-│  ├─ stores/             # Pinia：care（面板侧）
-│  ├─ components/         # care / settings 面板组件
-│  ├─ pet.ts              # 宠物窗入口（互动手势/调度接线）
-│  └─ main.ts             # 面板窗入口（托盘/关闭守卫）
-├─ src-tauri/             # Tauri 壳（main.rs 仅插件注册）
-└─ pet.html               # 宠物窗页面（透明置顶）
+│  ├─ assets/brand/       # 正式 Logo 原图
+│  ├─ assets/pets/        # 管线生成的植物状态帧
+│  ├─ config/             # 品牌名称与物种配置
+│  ├─ components/         # 养护、领养、AI 生成与设置
+│  ├─ lib/                # 数据、调度、互动、素材库与系统能力
+│  ├─ stores/             # Pinia 面板状态
+│  ├─ pet.ts              # 宠物窗入口
+│  └─ main.ts             # 面板入口与托盘
+├─ src-tauri/             # Tauri 壳、权限与桌面图标
+└─ pet.html               # 透明宠物窗页面
 ```
 
-## 文档
+## 文档与发布
 
-- [技术方案](docs/技术方案-植物数字分身桌面宠物.md) —— 选型、业务流程、分期规划、决策记录
-- [AI 生图与切图管线](docs/AI生图与切图管线.md) —— 提示词结构、一致性方法、素材入库流程
-- [生图自动化脚本设计](docs/生图自动化脚本设计.md) —— sprite-studio：接口适配、流程闸门、密钥获取
+- [技术方案](docs/技术方案-植物数字分身桌面宠物.md)：业务流程、分期规划与决策记录。
+- [AI 生图与切图管线](docs/AI生图与切图管线.md)：植物素材提示词、一致性与入库流程。
+- [生图自动化脚本设计](docs/生图自动化脚本设计.md)：CLI 与面板 AI 生成实现。
+- [品牌规范](docs/branding/品牌规范.md)：正式名称、Logo 与使用约定。
 
-## 平台状态
-
-| 平台                         | 状态                                                                 |
-| ---------------------------- | -------------------------------------------------------------------- |
-| macOS（Intel/Apple Silicon） | ✅ 已验证；当前产物为 x64（AS 走 Rosetta），arm64 原生包待工具链就绪 |
-| Windows                      | ⏳ 待验证（Phase 1 剩余项）                                          |
+发布工作流构建 macOS Apple Silicon、macOS Intel 与 Windows x64 三路产物。tag 触发后创建草稿 Release，人工核对后发布；也可手动触发 Actions，仅上传构建产物。macOS 已完成本机验证，Windows 安装与运行仍需真机验收。

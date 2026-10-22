@@ -25,9 +25,9 @@ async function bootstrap() {
 
   await guardPanelClose()
   const tray = await initTray()
-  await info(`[phase0] 托盘：${tray.detail}`)
+  await info(`[sproutkin] 托盘：${tray.detail}`)
 }
 
 bootstrap().catch((err) => {
-  logError(`[phase0] 启动失败：${String(err)}`)
+  logError(`[sproutkin] 启动失败：${String(err)}`)
 })

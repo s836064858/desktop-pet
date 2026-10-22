@@ -1,12 +1,13 @@
 # AGENTS.md · 项目协作约定
 
-植物数字分身桌面宠物（Tauri 2 + Vue3）。个人代码规范见 `~/AGENTS.md`，本文件是**项目特有**的约定，冲突时以本文件为准。
+芽伴 · Sproutkin，植物数字分身桌面宠物（Tauri 2 + Vue3）。个人代码规范见 `~/AGENTS.md`，本文件是**项目特有**的约定，冲突时以本文件为准。
 
 ## 必读文档
 
 - [docs/技术方案-植物数字分身桌面宠物.md](docs/技术方案-植物数字分身桌面宠物.md)：业务流程、分期规划、决策记录（§2 D1~D14）
 - [docs/AI生图与切图管线.md](docs/AI生图与切图管线.md)：素材入库唯一流程
 - [docs/生图自动化脚本设计.md](docs/生图自动化脚本设计.md)：素材生图自动化（`pnpm sprite`：probe/ask/gen/commit）
+- [docs/branding/品牌规范.md](docs/branding/品牌规范.md)：正式品牌名称与 v2 Logo 使用约定
 
 ## 命令
 
@@ -14,8 +15,9 @@
 pnpm tauri dev      # 开发运行
 pnpm typecheck      # 类型检查（交付前必须）
 pnpm build          # 类型检查 + 前端构建（交付门禁）
+pnpm icon           # 从正式 Logo 仅更新配置引用的 macOS / Windows 图标
 node scripts/process-sprites.mjs   # 素材切图
-pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 SPRITE_API_KEY）
+pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 ARK_API_KEY）
 ```
 
 ## 发布（.github/workflows/release.yml）
@@ -35,6 +37,9 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 
 
 ## 架构速记
 
+- 品牌：界面「芽伴 · Sproutkin」，安装包 `Sproutkin`；名称常量在 `src/config/brand.ts`，正式 v2 Logo 在 `src/assets/brand/logo.png`。更新图标执行 `pnpm icon`，不要重建旧占位图。
+- 平台：本期仅 macOS / Windows，无 iOS / Android；图标脚本仅保留 `tauri.conf.json` 引用的桌面图标，不提交移动端或未使用的 AppX 素材。
+- 品牌兼容：保留应用标识 `com.desktoppet.plantpet`、数据库 `plant-pet.db` 与配置文件 `phase0.json`，不要因更名重置已有用户数据；仓库地址仍为 `desktop-pet`。
 - 双窗口：`pet`（透明置顶常驻，调度器+互动手势+帧动画）/ `main`（面板，默认隐藏）
 - 跨窗事件：`care-changed`（调度器每 tick 广播，面板刷新）/ `plant-changed`（领养/重置广播，宠物窗换帧 + 调度器缓存失效）
 - 计时器：调度器 15s tick（宠物窗）；互动帧切换/眨眼定时器集中在 `petView.ts`，由 `disposeViewTimers` 统一清理

@@ -11,8 +11,13 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 
-const FILES = ['package.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock']
-const LOCK_BLOCK = /name = "plant-pet"\nversion = "[^"]+"/
+const FILES = [
+  'package.json',
+  'src-tauri/tauri.conf.json',
+  'src-tauri/Cargo.toml',
+  'src-tauri/Cargo.lock',
+]
+const LOCK_BLOCK = /name = "sproutkin"\nversion = "[^"]+"/
 
 const die = (msg) => {
   console.error(`✗ ${msg}`)
@@ -32,9 +37,11 @@ function readVersions() {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).version
   const conf = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')).version
   const toml = readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1]
-  const lock = readFileSync('src-tauri/Cargo.lock', 'utf8').match(LOCK_BLOCK)?.[0]?.match(/version = "([^"]+)"/)?.[1]
+  const lock = readFileSync('src-tauri/Cargo.lock', 'utf8')
+    .match(LOCK_BLOCK)?.[0]
+    ?.match(/version = "([^"]+)"/)?.[1]
   if (!toml) die('Cargo.toml 里没找到 [package] 的 version 行')
-  if (!lock) die('Cargo.lock 里没找到 plant-pet 条目的 version 行')
+  if (!lock) die('Cargo.lock 里没找到 sproutkin 条目的 version 行')
   return { 'package.json': pkg, 'tauri.conf.json': conf, 'Cargo.toml': toml, 'Cargo.lock': lock }
 }
 
@@ -48,17 +55,20 @@ function bumpVersions(version) {
   patch('package.json', /"version": "[^"]+"/, `"version": "${version}"`)
   patch('src-tauri/tauri.conf.json', /"version": "[^"]+"/, `"version": "${version}"`)
   patch('src-tauri/Cargo.toml', /^version = "[^"]+"/m, `version = "${version}"`)
-  patch('src-tauri/Cargo.lock', LOCK_BLOCK, `name = "plant-pet"\nversion = "${version}"`)
+  patch('src-tauri/Cargo.lock', LOCK_BLOCK, `name = "sproutkin"\nversion = "${version}"`)
 }
 
 function preflight(tag) {
   if (capture('git', ['rev-parse', '--abbrev-ref', 'HEAD']) !== 'main') die('请在 main 分支上发版')
   // 只拦已跟踪文件的未提交改动；untracked 文件不会进发版提交，不挡路
-  if (capture('git', ['status', '--porcelain', '--untracked-files=no']) !== '') die('工作区不干净，先提交或暂存（发版不代管无关改动）')
+  if (capture('git', ['status', '--porcelain', '--untracked-files=no']) !== '')
+    die('工作区不干净，先提交或暂存（发版不代管无关改动）')
   run('git', ['fetch', 'origin', 'main', '--quiet'])
-  if (capture('git', ['rev-list', '--count', 'HEAD..origin/main']) !== '0') die('本地 main 落后远端，先 git pull --ff-only')
+  if (capture('git', ['rev-list', '--count', 'HEAD..origin/main']) !== '0')
+    die('本地 main 落后远端，先 git pull --ff-only')
   if (capture('git', ['tag', '-l', tag]) !== '') die(`tag ${tag} 本地已存在`)
-  if (capture('git', ['ls-remote', '--tags', 'origin', `refs/tags/${tag}`]) !== '') die(`tag ${tag} 远端已存在`)
+  if (capture('git', ['ls-remote', '--tags', 'origin', `refs/tags/${tag}`]) !== '')
+    die(`tag ${tag} 远端已存在`)
 }
 
 // —— 主流程 ——
@@ -117,7 +127,9 @@ if (changed.length > 0) {
 run('git', ['tag', tag])
 run('git', ['push', 'origin', tag])
 
-const repo = capture('git', ['remote', 'get-url', 'origin']).match(/github\.com[:/](.+?)(?:\.git)?$/)?.[1]
+const repo = capture('git', ['remote', 'get-url', 'origin']).match(
+  /github\.com[:/](.+?)(?:\.git)?$/
+)?.[1]
 console.log(`\n✓ ${tag} 已推送，Actions 开始三平台打包`)
 if (repo) {
   console.log(`  进度：https://github.com/${repo}/actions`)

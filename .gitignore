@@ -8,8 +8,7 @@ src-tauri/gen/schemas
 # AI 原始生图（68MB，仅本地；切图产物 src/assets/pets 已入库）
 assets-src
 
-scripts/icon-source.png
 .DS_Store
 
-# sprite-studio：zeakai 生图/聊天接口密钥
+# sprite-studio：火山方舟 Ark 生图/文案接口密钥
 .env

@@ -20,5 +20,5 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
         .run(tauri::generate_context!())
-        .expect("plant-pet 启动失败");
+        .expect("芽伴 · Sproutkin 启动失败");
 }

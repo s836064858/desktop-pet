@@ -2,10 +2,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCareStore } from '../../stores/care'
-import { getSpeciesPreviewUrl } from '../../lib/speciesArt'
 import { listSpeciesCards } from '../../lib/speciesRegistry'
 import type { SpeciesCardItem } from '../../lib/speciesRegistry'
-import type { CareTask, CareTaskStatus, CareTaskType } from '../../lib/database'
+import type { CareTaskStatus, CareTaskType } from '../../lib/database'
 import SpeciesForgeDialog from './SpeciesForgeDialog.vue'
 
 const careStore = useCareStore()

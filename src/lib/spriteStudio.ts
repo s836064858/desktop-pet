@@ -85,7 +85,7 @@ export async function draftSpecies(apiKey: string, phrase: string): Promise<Spec
   const examples = Object.entries(builtinSpecies)
     .map(([code, s]) => `  {"code":"${code}","name":"${s.name}","desc":"${s.desc}"${s.states ? `,"states覆盖":${JSON.stringify(s.states)}` : ''}}`)
     .join('\n')
-  const system = `你是「植物数字分身桌面宠物」项目的素材文案助手。角色由 AI 生图产出，使用固定六段式提示词：[风格段]Q版卡通+游戏精灵立绘+粗黑描边+平涂糖果色+赛璐璐阴影；[载体段]陶土色圆形花盆作为身体+大圆眼睛+微笑嘴+粉腮红+小手小脚；[物种段]头顶植物特征；[构图段]正面全身构图，画面居中；[背景段]纯白色背景，单一角色，无文字，无水印；[质量段]高清细节。
+  const system = `你是「芽伴 · Sproutkin」项目的素材文案助手。角色由 AI 生图产出，使用固定六段式提示词：[风格段]Q版卡通+游戏精灵立绘+粗黑描边+平涂糖果色+赛璐璐阴影；[载体段]陶土色圆形花盆作为身体+大圆眼睛+微笑嘴+粉腮红+小手小脚；[物种段]头顶植物特征；[构图段]正面全身构图，画面居中；[背景段]纯白色背景，单一角色，无文字，无水印；[质量段]高清细节。
 
 风格段与载体段已锁定，你只负责为【一个新物种】产出物种段描述（desc）与 6 条状态句（states）。要求：
 1. desc 一句话、具象可直接画，写清植物器官的形状/颜色/质感/姿态。

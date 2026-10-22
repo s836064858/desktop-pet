@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "plant-pet",
+  "productName": "Sproutkin",
   "version": "0.1.0",
   "identifier": "com.desktoppet.plantpet",
   "build": {
@@ -17,7 +17,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "植物分身 · Phase 0 验证面板",
+        "title": "芽伴 · Sproutkin",
         "width": 800,
         "height": 640,
         "minWidth": 700,
@@ -26,7 +26,7 @@
       },
       {
         "label": "pet",
-        "title": "pet",
+        "title": "芽伴 · Sproutkin — 桌面伙伴",
         "url": "pet.html",
         "width": 240,
         "height": 300,
@@ -41,6 +41,7 @@
   },
   "bundle": {
     "active": true,
+    "shortDescription": "芽伴 · Sproutkin：植物养护与桌面陪伴",
     "targets": "all",
     "icon": [
       "icons/32x32.png",

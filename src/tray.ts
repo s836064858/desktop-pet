@@ -3,6 +3,7 @@ import { exit } from '@tauri-apps/plugin-process'
 import { Menu } from '@tauri-apps/api/menu'
 import { TrayIcon } from '@tauri-apps/api/tray'
 import { showPanelWindow } from './lib/capabilities'
+import { APP_DISPLAY_NAME } from './config/brand'
 
 export interface TrayOutcome {
   ok: boolean
@@ -30,9 +31,9 @@ export async function initTray(): Promise<TrayOutcome> {
       ],
     })
     const icon = await defaultWindowIcon()
-    const tray = await TrayIcon.new({
+    await TrayIcon.new({
       icon: icon ?? undefined,
-      tooltip: '植物分身 · Phase 0',
+      tooltip: APP_DISPLAY_NAME,
       menu,
       showMenuOnLeftClick: false,
       action: (event) => {

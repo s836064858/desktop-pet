@@ -77,11 +77,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: 植物分身桌面宠物 ${{ env.RELEASE_TAG }}
+          releaseName: 芽伴 · Sproutkin ${{ env.RELEASE_TAG }}
           releaseBody: |
-            桌面宠物安装包（未签名）。
+            芽伴 · Sproutkin 桌面植物伙伴安装包（未签名）。
 
-            - macOS arm64：Apple Silicon 原生；macOS x64：Intel 原生（Apple Silicon 也可经 Rosetta 运行 x64 包）。挂载 dmg 后将 plant-pet.app 拖入「应用程序」。首次打开若提示“无法验证开发者”，在 app 上右键 →「打开」，或执行 `xattr -cr /Applications/plant-pet.app`。
+            - macOS arm64：Apple Silicon 原生；macOS x64：Intel 原生（Apple Silicon 也可经 Rosetta 运行 x64 包）。挂载 dmg 后将 Sproutkin.app 拖入「应用程序」。首次打开若提示“无法验证开发者”，在 app 上右键 →「打开」，或执行 `xattr -cr /Applications/Sproutkin.app`。
             - Windows：msi 与 nsis exe 任选其一；SmartScreen 拦截时点「仍要运行」。
           releaseDraft: true
           prerelease: false
@@ -92,7 +92,7 @@ jobs:
         if: env.RELEASE_TAG == ''
         uses: actions/upload-artifact@v4
         with:
-          name: plant-pet-${{ matrix.target }}
+          name: sproutkin-${{ matrix.target }}
           path: |
             src-tauri/target/**/bundle/dmg/*.dmg
             src-tauri/target/**/bundle/msi/*.msi
