@@ -9,8 +9,6 @@ defineEmits<{ forge: []; retry: [] }>()
 const careStore = useCareStore()
 const selectedCode = shallowRef('')
 const nickname = shallowRef('')
-const waterIntervalH = shallowRef<number | undefined>(72)
-const sunIntervalH = shallowRef<number | undefined>(120)
 const isAdopting = shallowRef(false)
 const formError = shallowRef('')
 const selectedSpecies = computed(() =>
@@ -23,8 +21,6 @@ onUnmounted(() => {
 
 function pickSpecies(species: SpeciesCardItem): void {
   selectedCode.value = species.code
-  waterIntervalH.value = species.waterIntervalH
-  sunIntervalH.value = species.sunIntervalH
   formError.value = ''
 }
 
@@ -35,29 +31,12 @@ async function submitAdopt(): Promise<void> {
     formError.value = '先选一株想领养的植物吧。'
     return
   }
-  const water = waterIntervalH.value
-  const sun = sunIntervalH.value
-  if (
-    !water ||
-    !sun ||
-    !Number.isFinite(water) ||
-    !Number.isFinite(sun) ||
-    water < 6 ||
-    sun < 6 ||
-    water > 720 ||
-    sun > 720
-  ) {
-    formError.value = '养护间隔请填写 6～720 小时。'
-    return
-  }
   isAdopting.value = true
   formError.value = ''
   try {
     await careStore.adopt({
       speciesCode: species.code,
       nickname: nickname.value.trim() || species.name,
-      waterIntervalH: water,
-      sunIntervalH: sun,
     })
   } catch {
     if (isActive) formError.value = '领养失败，请稍后重试。'
@@ -100,7 +79,6 @@ async function submitAdopt(): Promise<void> {
         <img v-if="item.previewUrl" :src="item.previewUrl" alt="" draggable="false" />
         <span v-else class="species-placeholder">{{ item.emoji }}</span>
         <span class="species-name">{{ item.name }} <small v-if="item.isCustom">AI</small></span>
-        <span class="species-meta">浇水 {{ item.waterIntervalH / 24 }} 天</span>
       </button>
     </div>
     <form class="adopt-form" @submit.prevent="submitAdopt">
@@ -112,24 +90,6 @@ async function submitAdopt(): Promise<void> {
           maxlength="12"
           :disabled="isAdopting"
       /></label>
-      <label class="field-label"
-        ><span>浇水间隔 / 小时</span
-        ><el-input-number
-          v-model="waterIntervalH"
-          :min="6"
-          :max="720"
-          :step="24"
-          :disabled="isAdopting"
-      /></label>
-      <label class="field-label"
-        ><span>晒太阳间隔 / 小时</span
-        ><el-input-number
-          v-model="sunIntervalH"
-          :min="6"
-          :max="720"
-          :step="24"
-          :disabled="isAdopting"
-      /></label>
       <el-button
         type="primary"
         native-type="submit"
@@ -138,6 +98,7 @@ async function submitAdopt(): Promise<void> {
         >确认领养</el-button
       >
     </form>
+    <p class="muted">所有植物遵循统一的养护节奏：每 1 天浇水、每 2 天晒太阳。</p>
     <p v-if="formError" class="inline-note error-note" role="alert">{{ formError }}</p>
   </section>
 </template>
@@ -219,11 +180,6 @@ async function submitAdopt(): Promise<void> {
   font-size: 9px;
   font-weight: 500;
   color: #81986c;
-}
-.species-meta {
-  margin-top: 6px;
-  font-size: 10px;
-  color: #8b927f;
 }
 .selected-mark {
   position: absolute;

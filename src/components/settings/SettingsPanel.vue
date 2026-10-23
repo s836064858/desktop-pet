@@ -6,7 +6,6 @@ import AppIcon from '../common/AppIcon.vue'
 
 const careStore = useCareStore()
 const {
-  settings,
   isClickThrough,
   isAutostart,
   isLoading,
@@ -14,7 +13,6 @@ const {
   isResetting,
   loadError,
   loadSettings,
-  changeSettings,
   changeSystemSetting,
   resetAdopted,
 } = usePanelSettings()
@@ -28,36 +26,6 @@ const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(l
       {{ loadError }} <el-button text @click="loadSettings">重新加载</el-button>
     </p>
     <div v-else class="settings-row" :aria-busy="isLoading || isSaving">
-      <div class="setting-item quiet-setting">
-        <span class="setting-label">免打扰</span>
-        <div class="quiet-time">
-          <el-time-select
-            aria-label="免打扰开始时间"
-            :model-value="settings.quietStart"
-            :disabled="isDisabled || !settings.quietEnabled"
-            start="00:00"
-            end="23:45"
-            step="00:15"
-            @update:model-value="changeSettings({ quietStart: $event })"
-          />
-          <span>—</span>
-          <el-time-select
-            aria-label="免打扰结束时间"
-            :model-value="settings.quietEnd"
-            :disabled="isDisabled || !settings.quietEnabled"
-            start="00:00"
-            end="23:45"
-            step="00:15"
-            @update:model-value="changeSettings({ quietEnd: $event })"
-          />
-        </div>
-        <el-switch
-          aria-label="免打扰"
-          :model-value="settings.quietEnabled"
-          :disabled="isDisabled"
-          @change="changeSettings({ quietEnabled: Boolean($event) })"
-        />
-      </div>
       <div class="setting-item">
         <span class="setting-label">开机自启</span
         ><el-switch
@@ -120,37 +88,10 @@ const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(l
   border-left: 1px solid var(--sprout-line);
   padding-left: 18px;
 }
-.quiet-setting {
-  flex: 2.5;
-}
 .setting-label {
   white-space: nowrap;
   font-size: 12px;
   color: #505b4d;
-}
-.quiet-time {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #88907e;
-}
-.quiet-time .el-select {
-  width: 77px;
-}
-.quiet-time :deep(.el-select__wrapper) {
-  box-shadow: none;
-  padding: 0;
-  min-height: 26px;
-  background: transparent;
-}
-.quiet-time :deep(.el-select__prefix) {
-  display: none;
-}
-.quiet-time :deep(.el-select__suffix) {
-  width: 10px;
-}
-.quiet-time :deep(.el-select__selected-item) {
-  font-size: 11px;
 }
 .panel-footer {
   display: flex;
@@ -177,15 +118,9 @@ const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(l
     flex-wrap: wrap;
     gap: 10px 18px;
   }
-  .quiet-setting {
-    flex-basis: 100%;
-  }
   .setting-item:nth-child(2) {
     border: 0;
     padding-left: 0;
-  }
-  .quiet-time {
-    margin-left: auto;
   }
 }
 </style>

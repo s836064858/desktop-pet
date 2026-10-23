@@ -99,29 +99,7 @@ function updateState(frame: keyof ForgeForm['states'], value: string): void {
           /></label>
         </div>
       </details>
-      <div class="form-grid interval-fields">
-        <label class="field-label"
-          ><span>浇水间隔 / 小时</span
-          ><el-input-number
-            :model-value="form.waterIntervalH"
-            :min="6"
-            :max="720"
-            :step="24"
-            :disabled="isDisabled"
-            @update:model-value="updateField('waterIntervalH', $event)"
-        /></label>
-        <label class="field-label"
-          ><span>晒太阳间隔 / 小时</span
-          ><el-input-number
-            :model-value="form.sunIntervalH"
-            :min="6"
-            :max="720"
-            :step="24"
-            :disabled="isDisabled"
-            @update:model-value="updateField('sunIntervalH', $event)"
-        /></label>
-      </div>
-      <p class="inline-note"><AppIcon name="info" :size="14" /> 养护间隔请按实际植物习性确认。</p>
+      <p class="inline-note"><AppIcon name="info" :size="14" /> 养护节奏全物种统一：每 1 天浇水、每 2 天晒太阳。</p>
     </div>
     <div v-else class="draft-empty">
       <AppIcon name="leaf" :size="32" />
@@ -202,12 +180,6 @@ function updateState(frame: keyof ForgeForm['states'], value: string): void {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 16px;
-}
-.interval-fields {
-  margin: 16px 0;
-}
-.interval-fields .el-input-number {
-  width: 100%;
 }
 .draft-empty {
   display: flex;

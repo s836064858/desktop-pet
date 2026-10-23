@@ -41,9 +41,11 @@ export interface StreakInfo {
 export interface PlantAdoptInput {
   speciesCode: string
   nickname: string
-  waterIntervalH: number
-  sunIntervalH: number
 }
+
+// 全物种统一养护节奏，不提供前台配置；plant 表的两列仅为 schema 兼容保留
+export const WATER_INTERVAL_H = 24
+export const SUN_INTERVAL_H = 48
 
 export const POINTS_ONTIME = 10
 export const POINTS_EARLY = 8
@@ -122,7 +124,7 @@ export async function createPlant(input: PlantAdoptInput): Promise<Plant> {
   const db = await loadDb()
   await db.execute(
     'INSERT INTO plant (species_code, nickname, adopted_at, water_interval_h, sun_interval_h) VALUES ($1, $2, $3, $4, $5)',
-    [input.speciesCode, input.nickname, Date.now(), input.waterIntervalH, input.sunIntervalH],
+    [input.speciesCode, input.nickname, Date.now(), WATER_INTERVAL_H, SUN_INTERVAL_H],
   )
   const rows = await db.select<Plant[]>('SELECT * FROM plant ORDER BY id DESC LIMIT 1')
   if (!rows[0]) {

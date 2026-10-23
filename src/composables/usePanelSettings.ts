@@ -1,22 +1,14 @@
-import { onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { onMounted, onUnmounted, shallowRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   isAutostartOn,
-  readSettings,
-  saveSettings,
   setAutostart,
   setPetClickThrough,
 } from '../lib/capabilities'
-import type { AppSettings } from '../lib/capabilities'
 import { useCareStore } from '../stores/care'
 
 export function usePanelSettings() {
   const careStore = useCareStore()
-  const settings = ref<Pick<AppSettings, 'quietEnabled' | 'quietStart' | 'quietEnd'>>({
-    quietEnabled: false,
-    quietStart: '22:00',
-    quietEnd: '08:00',
-  })
   const isClickThrough = shallowRef(false)
   const isAutostart = shallowRef(false)
   const isLoading = shallowRef(false)
@@ -30,36 +22,13 @@ export function usePanelSettings() {
     isLoading.value = true
     loadError.value = ''
     try {
-      const [next, autostart] = await Promise.all([readSettings(), isAutostartOn()])
+      const autostart = await isAutostartOn()
       if (!isActive) return
-      settings.value = {
-        quietEnabled: next.quietEnabled,
-        quietStart: next.quietStart,
-        quietEnd: next.quietEnd,
-      }
       isAutostart.value = autostart
     } catch {
       if (isActive) loadError.value = '偏好设置加载失败，请重试。'
     } finally {
       if (isActive) isLoading.value = false
-    }
-  }
-
-  async function changeSettings(patch: Partial<AppSettings>): Promise<void> {
-    if (isSaving.value || isLoading.value) return
-    isSaving.value = true
-    try {
-      const next = await saveSettings(patch)
-      if (isActive)
-        settings.value = {
-          quietEnabled: next.quietEnabled,
-          quietStart: next.quietStart,
-          quietEnd: next.quietEnd,
-        }
-    } catch {
-      if (isActive) ElMessage.error('保存设置失败，请重试。')
-    } finally {
-      if (isActive) isSaving.value = false
     }
   }
 
@@ -115,7 +84,6 @@ export function usePanelSettings() {
     isActive = false
   })
   return {
-    settings,
     isClickThrough,
     isAutostart,
     isLoading,
@@ -123,7 +91,6 @@ export function usePanelSettings() {
     isResetting,
     loadError,
     loadSettings,
-    changeSettings,
     changeSystemSetting,
     resetAdopted,
   }

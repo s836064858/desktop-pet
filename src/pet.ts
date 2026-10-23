@@ -278,7 +278,7 @@ function onRemind(task: { type: CareTaskType }, plant: Plant, isSilent: boolean)
   }
   const nickname = plant.nickname
   if (isSilent) {
-    void info(`[pet] 免打扰中，静默提醒：${task.type}`)
+    void info(`[pet] 暂停期静默提醒：${task.type}`)
     return
   }
   if (task.type === 'water') {

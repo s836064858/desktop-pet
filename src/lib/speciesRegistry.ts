@@ -30,8 +30,6 @@ export async function listSpeciesCards(): Promise<SpeciesCardItem[]> {
       name: meta.name,
       emoji: meta.emoji,
       hue: 0,
-      waterIntervalH: meta.waterIntervalH,
-      sunIntervalH: meta.sunIntervalH,
       firstTaskDelayMin: 5,
       isCustom: true,
       previewUrl,

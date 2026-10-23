@@ -10,8 +10,6 @@ export interface CustomSpeciesMeta {
   emoji: string
   desc: string
   states: Record<string, string>
-  waterIntervalH: number
-  sunIntervalH: number
   createdAt: number
 }
 

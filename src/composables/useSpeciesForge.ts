@@ -25,8 +25,6 @@ function createForm(): ForgeForm {
     emoji: '🌱',
     desc: '',
     states: Object.fromEntries(FRAME_KEYS.map((frame) => [frame, ''])) as Record<FrameName, string>,
-    waterIntervalH: 72,
-    sunIntervalH: 120,
   }
 }
 
@@ -98,13 +96,6 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
     if (builtinSpeciesCodes().has(form.code)) return '物种标识已被内置植物使用，请换一个。'
     if (!form.name.trim() || !form.desc.trim()) return '请填写植物名称和外形描述。'
     if (FRAME_KEYS.some((frame) => !form.states[frame].trim())) return '请补齐六种状态描述。'
-    const intervals = [form.waterIntervalH, form.sunIntervalH]
-    if (
-      intervals.some(
-        (value) => typeof value !== 'number' || !Number.isFinite(value) || value < 6 || value > 720,
-      )
-    )
-      return '养护间隔请填写 6～720 小时。'
     return ''
   }
 
@@ -283,8 +274,6 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
       emoji: form.emoji.trim() || '🌱',
       desc: form.desc.trim(),
       states: { ...form.states },
-      waterIntervalH: form.waterIntervalH!,
-      sunIntervalH: form.sunIntervalH!,
     }
   }
 

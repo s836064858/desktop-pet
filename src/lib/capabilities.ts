@@ -11,17 +11,11 @@ const AFFECTION_KEY = 'affection'
 const SETTINGS_KEY = 'settings'
 
 export interface AppSettings {
-  quietEnabled: boolean
-  quietStart: string
-  quietEnd: string
   pausedUntil: number | null
   arkApiKey: string
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  quietEnabled: false,
-  quietStart: '22:00',
-  quietEnd: '08:00',
   pausedUntil: null,
   arkApiKey: '',
 }

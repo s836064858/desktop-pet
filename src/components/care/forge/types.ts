@@ -8,8 +8,6 @@ export interface ForgeForm {
   emoji: string
   desc: string
   states: Record<FrameName, string>
-  waterIntervalH: number | undefined
-  sunIntervalH: number | undefined
 }
 export const FRAME_META: Record<FrameName, { label: string; icon: string }> = {
   idle: { label: '基础形象', icon: 'leaf' },

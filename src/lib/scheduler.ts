@@ -7,11 +7,12 @@ import {
   listOpenTasks,
   markOverdue,
   markReminded,
+  SUN_INTERVAL_H,
+  WATER_INTERVAL_H,
 } from './database'
 import type { CareTask, CareTaskType, Plant } from './database'
 import { SPECIES } from '../config/species'
 import { readSettings } from './capabilities'
-import type { AppSettings } from './capabilities'
 
 const TICK_MS = 15_000
 const OVERDUE_AFTER_MS = 24 * 60 * 60 * 1000
@@ -48,29 +49,12 @@ function findOpenTask(tasks: CareTask[], type: CareTaskType): CareTask | undefin
   return tasks.find((task) => task.type === type)
 }
 
-export function isQuietNow(settings: AppSettings, now = new Date()): boolean {
-  if (!settings.quietEnabled) {
-    return false
-  }
-  const toMinutes = (text: string): number => {
-    const [h, m] = text.split(':').map(Number)
-    return (h ?? 0) * 60 + (m ?? 0)
-  }
-  const current = now.getHours() * 60 + now.getMinutes()
-  const start = toMinutes(settings.quietStart)
-  const end = toMinutes(settings.quietEnd)
-  if (start === end) {
-    return false
-  }
-  return start < end ? current >= start && current < end : current >= start || current < end
-}
-
-function isPaused(settings: AppSettings, now = Date.now()): boolean {
+function isPaused(settings: { pausedUntil: number | null }, now = Date.now()): boolean {
   return settings.pausedUntil !== null && now < settings.pausedUntil
 }
 
-function intervalMsOf(plant: Plant, type: CareTaskType): number {
-  const hours = type === 'water' ? plant.water_interval_h : plant.sun_interval_h
+function intervalMsOf(type: CareTaskType): number {
+  const hours = type === 'water' ? WATER_INTERVAL_H : SUN_INTERVAL_H
   return hours * 60 * 60 * 1000
 }
 
@@ -90,7 +74,7 @@ async function reconcileType(type: CareTaskType): Promise<void> {
     const lastCompletedAt = await getLastCompletedAt(plant.id, type)
     const scheduledAt = lastCompletedAt === null
       ? now + firstDelayMsOf(plant)
-      : lastCompletedAt + intervalMsOf(plant, type)
+      : lastCompletedAt + intervalMsOf(type)
     await createTask(plant.id, type, Math.max(scheduledAt, now + MIN_NEXT_DELAY_MS))
     open = await getOpenTask(plant.id, type)
   }
@@ -100,8 +84,7 @@ async function reconcileType(type: CareTaskType): Promise<void> {
   if (open.status === 'pending' && open.scheduled_at <= now) {
     await markReminded(open.id)
     const settings = await readSettings()
-    const isSilent = isQuietNow(settings) || isPaused(settings)
-    callbacks?.onRemind({ ...open, status: 'reminded' }, plant, isSilent)
+    callbacks?.onRemind({ ...open, status: 'reminded' }, plant, isPaused(settings))
   } else if (open.status === 'reminded' && now >= open.scheduled_at + OVERDUE_AFTER_MS) {
     await markOverdue(open.id)
   }
