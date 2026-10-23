@@ -17,30 +17,55 @@ import {
 } from '../lib/database'
 import type { CareTask, Plant, PlantAdoptInput } from '../lib/database'
 
+async function readSnapshot() {
+  await ensureSchema()
+  const nextPlant = await getPlant()
+  const [nextTasks, nextBalance, nextToday, nextStreak, nextCount] = await Promise.all([
+    nextPlant ? listOpenTasks(nextPlant.id) : Promise.resolve([]),
+    getPointsBalance(),
+    getTodayPointsSum(),
+    getStreak(),
+    getTotalCompletedCount(),
+  ])
+  return { nextPlant, nextTasks, nextBalance, nextToday, nextStreak, nextCount }
+}
+
 export const useCareStore = defineStore('care', () => {
   const tasks = ref<CareTask[]>([])
   const balance = ref(0)
   const todayEarned = ref(0)
   const plant = ref<Plant | null>(null)
   const stageName = ref('成熟期')
+  const completedCount = ref(0)
+  const loadError = ref('')
   const streakCurrent = ref(0)
   const isSnoozing = ref(false)
   const isLoaded = ref(false)
   let unlisten: (() => void) | null = null
+  let refreshVersion = 0
+  let lifecycleVersion = 0
 
   async function refresh(): Promise<void> {
+    const version = ++refreshVersion
     try {
-      await ensureSchema()
-      plant.value = await getPlant()
-      tasks.value = plant.value ? await listOpenTasks(plant.value.id) : []
-      balance.value = await getPointsBalance()
-      todayEarned.value = await getTodayPointsSum()
-      streakCurrent.value = (await getStreak()).currentCount
-      stageName.value = getStageFromCount(await getTotalCompletedCount()).name
-      isLoaded.value = true
-    } catch (err) {
-      ElMessage.error(`养护数据加载失败：${String(err)}`)
+      const snapshot = await readSnapshot()
+      if (version !== refreshVersion) return
+      applySnapshot(snapshot)
+    } catch {
+      if (version === refreshVersion) loadError.value = '养护数据加载失败，请重新加载。'
     }
+  }
+
+  function applySnapshot(snapshot: Awaited<ReturnType<typeof readSnapshot>>): void {
+    plant.value = snapshot.nextPlant
+    tasks.value = snapshot.nextTasks
+    balance.value = snapshot.nextBalance
+    todayEarned.value = snapshot.nextToday
+    streakCurrent.value = snapshot.nextStreak.currentCount
+    completedCount.value = snapshot.nextCount
+    stageName.value = getStageFromCount(snapshot.nextCount).name
+    loadError.value = ''
+    isLoaded.value = true
   }
 
   async function adopt(input: PlantAdoptInput): Promise<void> {
@@ -78,13 +103,26 @@ export const useCareStore = defineStore('care', () => {
   }
 
   async function init(): Promise<void> {
-    unlisten = await listen('care-changed', () => {
-      void refresh()
-    })
-    await refresh()
+    const version = ++lifecycleVersion
+    try {
+      const stop = await listen('care-changed', () => {
+        void refresh()
+      })
+      if (version !== lifecycleVersion) {
+        stop()
+        return
+      }
+      unlisten?.()
+      unlisten = stop
+      await refresh()
+    } catch {
+      if (version === lifecycleVersion) loadError.value = '养护数据连接失败，请重新打开面板。'
+    }
   }
 
   function dispose(): void {
+    lifecycleVersion += 1
+    refreshVersion += 1
     if (unlisten) {
       unlisten()
       unlisten = null
@@ -97,6 +135,8 @@ export const useCareStore = defineStore('care', () => {
     todayEarned,
     plant,
     stageName,
+    completedCount,
+    loadError,
     streakCurrent,
     isSnoozing,
     isLoaded,

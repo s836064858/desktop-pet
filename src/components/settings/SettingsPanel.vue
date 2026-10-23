@@ -1,217 +1,191 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { isAutostartOn, readSettings, saveSettings, setAutostart, setPetClickThrough } from '../../lib/capabilities'
-import type { AppSettings } from '../../lib/capabilities'
+import { computed } from 'vue'
 import { useCareStore } from '../../stores/care'
+import { usePanelSettings } from '../../composables/usePanelSettings'
+import AppIcon from '../common/AppIcon.vue'
 
 const careStore = useCareStore()
-const { plant } = storeToRefs(careStore)
-
-const settings = ref<AppSettings>({
-  quietEnabled: false,
-  quietStart: '22:00',
-  quietEnd: '08:00',
-  pausedUntil: null,
-  arkApiKey: '',
-})
-const isClickThrough = ref(false)
-const isAutostart = ref(false)
-const arkKeyInput = ref('')
-
-async function saveArkKey(): Promise<void> {
-  try {
-    settings.value = await saveSettings({ arkApiKey: arkKeyInput.value.trim() })
-    ElMessage.success('AI 素材密钥已保存')
-  } catch (err) {
-    ElMessage.error(`保存密钥失败：${String(err)}`)
-  }
-}
-
-async function patchSettings(patch: Partial<AppSettings>): Promise<void> {
-  try {
-    settings.value = await saveSettings(patch)
-  } catch (err) {
-    ElMessage.error(`保存设置失败：${String(err)}`)
-  }
-}
-
-const onChangeQuiet = (value: string | number | boolean) => {
-  void patchSettings({ quietEnabled: Boolean(value) })
-}
-
-const onChangeQuietStart = (value: string) => {
-  void patchSettings({ quietStart: value })
-}
-
-const onChangeQuietEnd = (value: string) => {
-  void patchSettings({ quietEnd: value })
-}
-
-const onChangeClickThrough = (value: string | number | boolean) => {
-  setPetClickThrough(Boolean(value))
-    .then(() => {
-      isClickThrough.value = Boolean(value)
-    })
-    .catch((err: unknown) => {
-      ElMessage.error(`切换穿透失败：${String(err)}`)
-    })
-}
-
-const onChangeAutostart = (value: string | number | boolean) => {
-  setAutostart(Boolean(value))
-    .then(() => {
-      isAutostart.value = Boolean(value)
-      ElMessage.success(Boolean(value) ? '已写入系统启动项' : '已移出系统启动项')
-    })
-    .catch((err: unknown) => {
-      ElMessage.error(`切换自启失败：${String(err)}`)
-    })
-}
-
-async function confirmReset(): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      '将删除当前植物与它的全部任务（积分保留），桌面分身会离开。确定重新领养吗？',
-      '重新领养',
-      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '再想想' },
-    )
-  } catch {
-    return
-  }
-  try {
-    await careStore.resetAdopted()
-    ElMessage.success('已送别，可以重新领养了')
-  } catch (err) {
-    ElMessage.error(`重置失败：${String(err)}`)
-  }
-}
-
-onMounted(async () => {
-  try {
-    settings.value = await readSettings()
-    arkKeyInput.value = settings.value.arkApiKey
-    isClickThrough.value = false
-    isAutostart.value = await isAutostartOn()
-  } catch (err) {
-    ElMessage.error(`设置加载失败：${String(err)}`)
-  }
-})
+const {
+  settings,
+  isClickThrough,
+  isAutostart,
+  isLoading,
+  isSaving,
+  isResetting,
+  loadError,
+  loadSettings,
+  changeSettings,
+  changeSystemSetting,
+  resetAdopted,
+} = usePanelSettings()
+const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(loadError.value))
 </script>
 
 <template>
-  <section class="settings">
-    <h3 class="settings-title">设置</h3>
-    <div class="settings-grid">
-      <div class="settings-item">
-        <span class="settings-label">免打扰时段（提醒静默，互动照常）</span>
-        <div class="settings-inline">
-          <el-switch :model-value="settings.quietEnabled" @change="onChangeQuiet" />
+  <section class="settings" aria-labelledby="settings-heading">
+    <div class="section-heading"><h2 id="settings-heading" class="section-title">偏好设置</h2></div>
+    <p v-if="loadError" class="inline-note error-note" role="alert">
+      {{ loadError }} <el-button text @click="loadSettings">重新加载</el-button>
+    </p>
+    <div v-else class="settings-row" :aria-busy="isLoading || isSaving">
+      <div class="setting-item quiet-setting">
+        <span class="setting-label">免打扰</span>
+        <div class="quiet-time">
           <el-time-select
-            class="settings-time"
+            aria-label="免打扰开始时间"
             :model-value="settings.quietStart"
-            :disabled="!settings.quietEnabled"
+            :disabled="isDisabled || !settings.quietEnabled"
             start="00:00"
             end="23:45"
             step="00:15"
-            @update:model-value="onChangeQuietStart"
+            @update:model-value="changeSettings({ quietStart: $event })"
           />
-          <span>至</span>
+          <span>—</span>
           <el-time-select
-            class="settings-time"
+            aria-label="免打扰结束时间"
             :model-value="settings.quietEnd"
-            :disabled="!settings.quietEnabled"
+            :disabled="isDisabled || !settings.quietEnabled"
             start="00:00"
             end="23:45"
             step="00:15"
-            @update:model-value="onChangeQuietEnd"
+            @update:model-value="changeSettings({ quietEnd: $event })"
           />
         </div>
+        <el-switch
+          aria-label="免打扰"
+          :model-value="settings.quietEnabled"
+          :disabled="isDisabled"
+          @change="changeSettings({ quietEnabled: Boolean($event) })"
+        />
       </div>
-      <div class="settings-item">
-        <span class="settings-label">宠物窗鼠标穿透（鼠标穿过宠物）</span>
-        <el-switch :model-value="isClickThrough" @change="onChangeClickThrough" />
+      <div class="setting-item">
+        <span class="setting-label">开机自启</span
+        ><el-switch
+          aria-label="开机自启"
+          :model-value="isAutostart"
+          :disabled="isDisabled"
+          @change="changeSystemSetting('autostart', Boolean($event))"
+        />
       </div>
-      <div class="settings-item">
-        <span class="settings-label">开机自启</span>
-        <el-switch :model-value="isAutostart" @change="onChangeAutostart" />
-      </div>
-      <div class="settings-item">
-        <span class="settings-label">
-          AI 素材密钥（火山方舟）
-          <span class="settings-hint">用于 AI 生成新物种；获取：console.volcengine.com/ark</span>
-        </span>
-        <div class="settings-inline">
-          <el-input
-            v-model="arkKeyInput"
-            type="password"
-            show-password
-            size="small"
-            placeholder="ARK_API_KEY"
-            class="settings-key"
-          />
-          <el-button size="small" @click="saveArkKey">保存</el-button>
-        </div>
-      </div>
-      <div class="settings-item">
-        <span class="settings-label">送别当前植物，重新领养</span>
-        <el-button size="small" type="danger" plain :disabled="!plant" @click="confirmReset">
-          重新领养
-        </el-button>
+      <div class="setting-item">
+        <span class="setting-label">鼠标穿透</span
+        ><el-switch
+          aria-label="鼠标穿透"
+          :model-value="isClickThrough"
+          :disabled="isDisabled"
+          @change="changeSystemSetting('clickThrough', Boolean($event))"
+        />
       </div>
     </div>
+    <footer class="panel-footer">
+      <span class="footer-hint"
+        ><AppIcon name="info" :size="14" /> 关闭面板后，植物仍会陪在桌面</span
+      >
+      <el-button
+        class="reset-action"
+        text
+        :loading="isResetting"
+        :disabled="!careStore.plant || !careStore.isLoaded"
+        @click="resetAdopted"
+        ><AppIcon name="refresh" :size="14" /> 重新领养</el-button
+      >
+    </footer>
   </section>
 </template>
 
 <style scoped>
 .settings {
-  margin-top: 16px;
+  border-top: 1px solid var(--sprout-line);
+  margin-top: 22px;
+  padding-top: 18px;
 }
-
-.settings-title {
-  margin: 0 0 10px;
-  font-size: 14px;
-  color: #606266;
-}
-
-.settings-grid {
+.settings-row {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  border: 1px solid var(--sprout-line);
+  border-radius: 9px;
+  padding: 12px 14px;
+  gap: 18px;
+  background: #fcfbf5;
 }
-
-.settings-item {
+.setting-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
-
-.settings-label {
-  font-size: 13px;
-  color: #303133;
+.setting-item + .setting-item {
+  border-left: 1px solid var(--sprout-line);
+  padding-left: 18px;
 }
-
-.settings-inline {
+.quiet-setting {
+  flex: 2.5;
+}
+.setting-label {
+  white-space: nowrap;
+  font-size: 12px;
+  color: #505b4d;
+}
+.quiet-time {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #606266;
+  gap: 4px;
+  color: #88907e;
 }
-
-.settings-time {
-  width: 110px;
+.quiet-time .el-select {
+  width: 77px;
 }
-
-.settings-key {
-  width: 220px;
+.quiet-time :deep(.el-select__wrapper) {
+  box-shadow: none;
+  padding: 0;
+  min-height: 26px;
+  background: transparent;
 }
-
-.settings-hint {
-  display: block;
+.quiet-time :deep(.el-select__prefix) {
+  display: none;
+}
+.quiet-time :deep(.el-select__suffix) {
+  width: 10px;
+}
+.quiet-time :deep(.el-select__selected-item) {
   font-size: 11px;
-  color: #909399;
+}
+.panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.footer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #8c9284;
+}
+.reset-action {
+  color: #ba7657;
+  padding-inline: 0;
+  gap: 5px;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .settings-row {
+    flex-wrap: wrap;
+    gap: 10px 18px;
+  }
+  .quiet-setting {
+    flex-basis: 100%;
+  }
+  .setting-item:nth-child(2) {
+    border: 0;
+    padding-left: 0;
+  }
+  .quiet-time {
+    margin-left: auto;
+  }
 }
 </style>

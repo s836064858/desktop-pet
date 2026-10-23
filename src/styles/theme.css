@@ -1,0 +1,131 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #294b3b;
+  background: #f8f7f1;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  --sprout-ink: #294b3b;
+  --sprout-muted: #7b8275;
+  --sprout-line: #dedfd3;
+  --sprout-sage: #e9eddf;
+  --sprout-paper: #f8f7f1;
+  --sprout-accent: #c87955;
+  --el-color-primary: #c87955;
+  --el-color-primary-light-3: #d8a185;
+  --el-color-primary-light-5: #e4bda8;
+  --el-color-primary-light-7: #eed7ca;
+  --el-color-primary-light-8: #f3e5dc;
+  --el-color-primary-light-9: #faf0e8;
+  --el-color-primary-dark-2: #ad6241;
+  --el-color-success: #39815d;
+  --el-color-warning: #b47835;
+  --el-color-danger: #bb5944;
+  --el-color-info: #7b8275;
+  --el-text-color-primary: #294b3b;
+  --el-text-color-regular: #505b4d;
+  --el-text-color-secondary: #7b8275;
+  --el-border-color: #d9dccf;
+  --el-border-color-light: #e5e6dc;
+  --el-fill-color-blank: #fffef9;
+  --el-fill-color-light: #f0f2e9;
+  --el-bg-color: #fffef9;
+  --el-bg-color-overlay: #fffef9;
+  --el-border-radius-base: 8px;
+  --el-font-size-base: 13px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 360px;
+}
+button,
+input,
+textarea {
+  font: inherit;
+}
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #39815d;
+  outline-offset: 4px;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+.el-button {
+  font-weight: 500;
+}
+.el-button--default {
+  --el-button-bg-color: transparent;
+}
+.el-switch {
+  --el-switch-on-color: #438866;
+}
+.el-dialog {
+  border: 1px solid var(--sprout-line);
+  border-radius: 16px;
+}
+.el-overlay-dialog {
+  padding: 20px;
+}
+.el-message {
+  max-width: calc(100vw - 40px);
+}
+.el-message__content {
+  overflow-wrap: anywhere;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+.muted {
+  color: var(--sprout-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.inline-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #edf1e5;
+  color: #617257;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #505b4d;
+  font-size: 12px;
+}
+.error-note {
+  color: #a84d37;
+  background: #fbede3;
+  overflow-wrap: anywhere;
+}
+.el-progress-bar__outer {
+  background-color: #e3e8d9;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

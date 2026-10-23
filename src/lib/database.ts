@@ -50,7 +50,7 @@ export const POINTS_EARLY = 8
 export const POINTS_LATE = 5
 export const DAILY_POINTS_CAP = 20
 
-const FULL_FORM_THRESHOLD = 30
+export const FULL_FORM_THRESHOLD = 30
 
 export function getStageFromCount(count: number): { index: number, name: string } {
   if (count >= FULL_FORM_THRESHOLD) {

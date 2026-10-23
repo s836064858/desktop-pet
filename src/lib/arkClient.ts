@@ -30,7 +30,7 @@ async function arkPost(path: string, body: unknown, opts: ArkCallOptions, timeou
       continue
     }
     if (res.status === 401 || res.status === 403) {
-      throw new Error(`鉴权失败（HTTP ${res.status}）：请到设置页检查 ARK_API_KEY`)
+      throw new Error(`鉴权失败（HTTP ${res.status}）：请在 AI 弹窗中检查素材密钥`)
     }
     if (res.status === 429 || res.status >= 500) {
       if (attempt > BACKOFF_MS.length) throw new Error(`${label} HTTP ${res.status}（重试后仍失败）`)

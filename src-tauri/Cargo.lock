@@ -2866,23 +2866,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
-name = "sproutkin"
-version = "0.1.0"
-dependencies = [
- "log",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-fs",
- "tauri-plugin-http",
- "tauri-plugin-log",
- "tauri-plugin-notification",
- "tauri-plugin-process",
- "tauri-plugin-sql",
- "tauri-plugin-store",
-]
-
-[[package]]
 name = "plist"
 version = "1.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3925,6 +3908,23 @@ checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
 dependencies = [
  "base64ct",
  "der",
+]
+
+[[package]]
+name = "sproutkin"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-fs",
+ "tauri-plugin-http",
+ "tauri-plugin-log",
+ "tauri-plugin-notification",
+ "tauri-plugin-process",
+ "tauri-plugin-sql",
+ "tauri-plugin-store",
 ]
 
 [[package]]

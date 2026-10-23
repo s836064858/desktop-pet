@@ -1,525 +1,287 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { readSettings } from '../../lib/capabilities'
-import { arkGenerateImage, bytesToDataUrl } from '../../lib/arkClient'
-import {
-  FRAME_KEYS,
-  buildDerivedPrompt,
-  buildIdlePrompt,
-  draftSpecies,
-  generateFramePng,
-} from '../../lib/spriteStudio'
-import type { SpeciesDraft } from '../../lib/spriteStudio'
-import { processSpritePng } from '../../lib/spritePipeline'
-import { getCustomSpecies, saveSpeciesToLibrary } from '../../lib/spriteLibrary'
-import { builtinSpeciesCodes } from '../../lib/speciesRegistry'
-import type { FrameName } from '../../lib/speciesArt'
-import styleRefUrl from '../../assets/sprite-ref/style-ref.png'
-
-type FrameStatus = 'pending' | 'running' | 'done' | 'error'
+import { useSpeciesForge } from '../../composables/useSpeciesForge'
+import type { ForgeForm } from './forge/types'
+import ForgeApiKey from './forge/ForgeApiKey.vue'
+import ForgeCompose from './forge/ForgeCompose.vue'
+import ForgeProgress from './forge/ForgeProgress.vue'
+import ForgeGallery from './forge/ForgeGallery.vue'
+import AppIcon from '../common/AppIcon.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
-const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void, (e: 'saved', code: string): void }>()
-
-const step = ref<'compose' | 'generate' | 'gallery'>('compose')
-const phrase = ref('')
-const drafting = ref(false)
-const hasDraft = ref(false)
-const generating = ref(false)
-const saving = ref(false)
-const regenerating = ref<FrameName | null>(null)
-
-const form = ref({
-  code: '',
-  name: '',
-  emoji: '🌱',
-  desc: '',
-  states: Object.fromEntries(FRAME_KEYS.map((f) => [f, ''])) as Record<FrameName, string>,
-  waterIntervalH: 72,
-  sunIntervalH: 120,
-})
-
-const frameStatus = ref<Record<FrameName, FrameStatus>>(Object.fromEntries(FRAME_KEYS.map((f) => [f, 'pending'])) as Record<FrameName, FrameStatus>)
-const frameUrls = ref<Partial<Record<FrameName, string>>>({})
-const frameBytes = ref<Partial<Record<FrameName, Uint8Array>>>({})
-
+const emit = defineEmits<{ 'update:modelValue': [value: boolean]; saved: [code: string] }>()
+const hasKey = shallowRef(false)
+const isKeyBusy = shallowRef(true)
+const {
+  form,
+  step,
+  phrase,
+  hasDraft,
+  isDrafting,
+  isGenerating,
+  isSaving,
+  regeneratingFrame,
+  errorMessage,
+  frameStatus,
+  frameUrls,
+  isBusy: isForgeBusy,
+  doneCount,
+  allDone,
+  hasError,
+  startDraft,
+  startGenerate,
+  regenerate,
+  saveToLibrary,
+  returnToCompose,
+} = useSpeciesForge({ onSaved })
 const stepIndex = computed(() => (step.value === 'compose' ? 0 : step.value === 'generate' ? 1 : 2))
-const hasError = computed(() => FRAME_KEYS.some((f) => frameStatus.value[f] === 'error'))
-const allDone = computed(() => FRAME_KEYS.every((f) => frameStatus.value[f] === 'done'))
+const isBusy = computed(() => isForgeBusy.value || isKeyBusy.value)
 
-let styleRefBytes: Uint8Array | null = null
-
-watch(
-  () => props.modelValue,
-  (open) => {
-    if (open) resetWizard()
-  },
-)
-
-function resetWizard(): void {
-  step.value = 'compose'
-  phrase.value = ''
-  drafting.value = false
-  hasDraft.value = false
-  generating.value = false
-  saving.value = false
-  regenerating.value = null
-  form.value = {
-    code: '',
-    name: '',
-    emoji: '🌱',
-    desc: '',
-    states: Object.fromEntries(FRAME_KEYS.map((f) => [f, ''])) as Record<FrameName, string>,
-    waterIntervalH: 72,
-    sunIntervalH: 120,
-  }
-  frameStatus.value = Object.fromEntries(FRAME_KEYS.map((f) => [f, 'pending'])) as Record<FrameName, FrameStatus>
-  frameUrls.value = {}
-  frameBytes.value = {}
+function onSaved(code: string): void {
+  emit('saved', code)
+  emit('update:modelValue', false)
 }
-
-function onVisibleChange(v: boolean): void {
-  emit('update:modelValue', v)
+function updateForm(next: ForgeForm): void {
+  Object.assign(form, next)
 }
-
-async function ensureApiKey(): Promise<string> {
-  const { arkApiKey } = await readSettings()
-  const key = arkApiKey.trim()
-  if (!key) {
-    throw new Error('请先到「设置」页配置 AI 素材密钥（ARK_API_KEY）')
-  }
-  return key
+function onKeyStatus(status: { hasKey: boolean; isBusy: boolean }): void {
+  hasKey.value = status.hasKey
+  isKeyBusy.value = status.isBusy
 }
-
-async function loadStyleRefBytes(): Promise<Uint8Array> {
-  if (!styleRefBytes) {
-    styleRefBytes = new Uint8Array(await (await fetch(styleRefUrl)).arrayBuffer())
-  }
-  return styleRefBytes
-}
-
-function applyDraft(d: SpeciesDraft): void {
-  form.value.code = d.code
-  form.value.name = d.name
-  form.value.emoji = d.emoji
-  form.value.desc = d.desc
-  for (const f of FRAME_KEYS) {
-    form.value.states[f] = d.states[f]
-  }
-  hasDraft.value = true
-}
-
-async function startDraft(): Promise<void> {
-  if (!phrase.value.trim()) {
-    ElMessage.warning('先输入想生成的植物名')
+function requestClose(done: () => void): void {
+  if (isBusy.value) {
+    ElMessage.info('正在处理，请完成后再关闭。')
     return
   }
-  drafting.value = true
-  try {
-    const key = await ensureApiKey()
-    const d = await draftSpecies(key, phrase.value.trim())
-    if (builtinSpeciesCodes().has(d.code)) {
-      throw new Error(`code 与内置物种冲突：${d.code}，请换个名字重新起草`)
-    }
-    if (await getCustomSpecies(d.code)) {
-      throw new Error(`本地资源库已存在 "${d.code}"，请换个物种或修改 code`)
-    }
-    applyDraft(d)
-  } catch (err) {
-    ElMessage.error(`起草失败：${String(err)}`)
-  } finally {
-    drafting.value = false
-  }
+  done()
 }
-
-function validateForm(): string | null {
-  if (!/^[a-z][a-z0-9-]*$/.test(form.value.code)) return 'code 需为英文小写/数字/中划线'
-  if (builtinSpeciesCodes().has(form.value.code)) return `code 与内置物种冲突：${form.value.code}`
-  if (!form.value.name.trim()) return '名字不能为空'
-  if (!form.value.desc.trim()) return '物种描述不能为空'
-  for (const f of FRAME_KEYS) {
-    if (!form.value.states[f].trim()) return `状态句 ${f} 不能为空`
-  }
-  if (form.value.waterIntervalH < 6 || form.value.sunIntervalH < 6) return '养护间隔至少 6 小时'
-  return null
+function onVisibleChange(value: boolean): void {
+  if (!value && isBusy.value) return
+  emit('update:modelValue', value)
 }
-
-function frameObjectUrl(frame: FrameName, bytes: Uint8Array): string {
-  const prev = frameUrls.value[frame]
-  if (prev) URL.revokeObjectURL(prev)
-  return URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'image/png' }))
-}
-
-async function generateOne(frame: FrameName, apiKey: string, idleDataUrl: string | null): Promise<Uint8Array> {
-  frameStatus.value[frame] = 'running'
-  try {
-    const prompt =
-      frame === 'idle'
-        ? buildIdlePrompt(form.value.desc.trim())
-        : buildDerivedPrompt(form.value.desc.trim(), frame, form.value.states[frame].trim())
-    const refBytes = frame === 'idle' ? await loadStyleRefBytes() : frameBytes.value.idle
-    if (!refBytes) throw new Error('缺少参考图')
-    let bytes: Uint8Array
-    if (frame === 'idle') {
-      bytes = await generateFramePng({ apiKey, prompt, refPngBytes: refBytes })
-    } else {
-      // 衍生帧：参考本次生成的 idle（dataUrl 形式）
-      const refDataUrl = idleDataUrl ?? (await bytesToDataUrl(refBytes))
-      bytes = await arkGenerateImage({ apiKey, prompt, refDataUrl })
-    }
-    frameBytes.value[frame] = bytes
-    frameUrls.value[frame] = frameObjectUrl(frame, bytes)
-    frameStatus.value[frame] = 'done'
-    return bytes
-  } catch (err) {
-    frameStatus.value[frame] = 'error'
-    throw err
-  }
-}
-
-async function startGenerate(): Promise<void> {
-  const invalid = validateForm()
-  if (invalid) {
-    ElMessage.warning(invalid)
-    return
-  }
-  let apiKey: string
-  try {
-    apiKey = await ensureApiKey()
-  } catch (err) {
-    ElMessage.error(String(err))
-    return
-  }
-  step.value = 'generate'
-  generating.value = true
-  frameStatus.value = Object.fromEntries(FRAME_KEYS.map((f) => [f, 'pending'])) as Record<FrameName, FrameStatus>
-  try {
-    const idleBytes = await generateOne('idle', apiKey, null)
-    const idleDataUrl = await bytesToDataUrl(idleBytes)
-    for (const frame of FRAME_KEYS) {
-      if (frame === 'idle') continue
-      try {
-        await generateOne(frame, apiKey, idleDataUrl)
-      } catch (err) {
-        ElMessage.error(`${frame} 帧生成失败：${String(err)}`)
-      }
-    }
-    const okCount = FRAME_KEYS.filter((f) => frameStatus.value[f] === 'done').length
-    ElMessage.success(`生成完成：${okCount}/6 帧${okCount < 6 ? '，失败帧可在下一步重试' : ''}`)
-  } finally {
-    generating.value = false
-  }
-}
-
-async function regenerate(frame: FrameName): Promise<void> {
-  if (regenerating.value !== null) return
-  let apiKey: string
-  try {
-    apiKey = await ensureApiKey()
-  } catch (err) {
-    ElMessage.error(String(err))
-    return
-  }
-  regenerating.value = frame
-  try {
-    const idleDataUrl =
-      frame === 'idle' || !frameBytes.value.idle ? null : await bytesToDataUrl(frameBytes.value.idle)
-    await generateOne(frame, apiKey, idleDataUrl)
-  } catch (err) {
-    ElMessage.error(`${frame} 重生成失败：${String(err)}`)
-  } finally {
-    regenerating.value = null
-  }
-}
-
-async function saveToLibrary(): Promise<void> {
-  if (!allDone.value) {
-    ElMessage.warning('还有帧未生成完成（失败的帧请先点「重生成」）')
-    return
-  }
-  const invalid = validateForm()
-  if (invalid) {
-    ElMessage.warning(invalid)
-    return
-  }
-  saving.value = true
-  try {
-    const frames: Partial<Record<FrameName, Uint8Array>> = {}
-    for (const f of FRAME_KEYS) {
-      frames[f] = await processSpritePng(frameBytes.value[f] as Uint8Array)
-    }
-    await saveSpeciesToLibrary(
-      {
-        code: form.value.code,
-        name: form.value.name.trim(),
-        emoji: form.value.emoji.trim() || '🌱',
-        desc: form.value.desc.trim(),
-        states: { ...form.value.states },
-        waterIntervalH: form.value.waterIntervalH,
-        sunIntervalH: form.value.sunIntervalH,
-      },
-      frames,
-    )
-    ElMessage.success(`"${form.value.name}" 已入库，领养页可以直接领养啦`)
-    emit('saved', form.value.code)
-    emit('update:modelValue', false)
-  } catch (err) {
-    ElMessage.error(`入库失败：${String(err)}`)
-  } finally {
-    saving.value = false
-  }
-}
-
-function statusTag(status: FrameStatus): 'info' | 'warning' | 'success' | 'danger' {
-  if (status === 'done') return 'success'
-  if (status === 'running') return 'warning'
-  if (status === 'error') return 'danger'
-  return 'info'
-}
-
-function statusText(status: FrameStatus): string {
-  if (status === 'done') return '完成'
-  if (status === 'running') return '生成中…'
-  if (status === 'error') return '失败'
-  return '排队中'
+function showGallery(): void {
+  if (!isBusy.value) step.value = 'gallery'
 }
 </script>
 
 <template>
   <el-dialog
-    :model-value="modelValue"
-    width="760px"
+    :model-value="props.modelValue"
+    class="species-forge"
+    width="min(640px, calc(100vw - 40px))"
+    align-center
     append-to-body
     :close-on-click-modal="false"
+    :close-on-press-escape="!isBusy"
+    :show-close="!isBusy"
+    :before-close="requestClose"
     @update:model-value="onVisibleChange"
   >
-    <template #header>
-      <span>✨ AI 生成新物种</span>
-    </template>
-
-    <el-steps :active="stepIndex" align-center finish-status="success" class="forge-steps">
-      <el-step title="文案与设定" />
-      <el-step title="生成 6 帧" />
-      <el-step title="确认入库" />
-    </el-steps>
-
-    <div v-if="step === 'compose'" class="forge-body">
-      <div class="forge-row">
-        <el-input
-          v-model="phrase"
-          placeholder="想生成什么植物？例如：薰衣草"
-          @keyup.enter="startDraft"
-        />
-        <el-button type="primary" :loading="drafting" @click="startDraft">
-          {{ hasDraft ? '重新起草' : 'AI 起草文案' }}
-        </el-button>
+    <template #header
+      ><div class="forge-title">
+        <AppIcon name="sparkles" :size="20" /><span>AI 生成新物种</span>
+      </div></template
+    >
+    <nav class="forge-steps" aria-label="生成步骤">
+      <div
+        v-for="(title, index) in ['描述植物', '生成形象', '确认入库']"
+        :key="title"
+        class="forge-step"
+        :class="{ 'is-active': index <= stepIndex }"
+        :aria-current="index === stepIndex ? 'step' : undefined"
+      >
+        <span class="step-number"
+          ><AppIcon v-if="index < stepIndex" name="check" :size="14" /><template v-else>{{
+            index + 1
+          }}</template></span
+        ><span>{{ title }}</span>
       </div>
-      <p class="forge-hint">
-        将调用火山方舟生成 6 帧（每帧 1 张），费用很小；密钥在「设置」页配置。入库前可逐帧重生成。
+    </nav>
+    <div class="forge-body">
+      <ForgeApiKey :is-disabled="isForgeBusy" @status="onKeyStatus" />
+      <ForgeCompose
+        v-if="step === 'compose'"
+        :form="form"
+        v-model:phrase="phrase"
+        :has-draft="hasDraft"
+        :is-drafting="isDrafting"
+        :is-disabled="isBusy"
+        :has-key="hasKey"
+        @update:form="updateForm"
+        @draft="startDraft"
+      />
+      <ForgeProgress
+        v-else-if="step === 'generate'"
+        :name="form.name"
+        :frame-status="frameStatus"
+        :preview-url="frameUrls.idle"
+        :done-count="doneCount"
+        :is-generating="isGenerating"
+      />
+      <ForgeGallery
+        v-else
+        :frame-urls="frameUrls"
+        :frame-status="frameStatus"
+        :regenerating-frame="regeneratingFrame"
+        :is-disabled="isBusy"
+        @regenerate="regenerate"
+      />
+    </div>
+    <template #footer>
+      <p v-if="errorMessage" class="inline-note error-note forge-error" role="alert">
+        {{ errorMessage }}
       </p>
-
-      <template v-if="hasDraft">
-        <el-divider content-position="left">物种设定（可编辑）</el-divider>
-        <div class="forge-grid">
-          <label class="forge-field">
-            <span>code</span>
-            <el-input v-model="form.code" size="small" placeholder="英文小写，如 lavender" />
-          </label>
-          <label class="forge-field">
-            <span>名字</span>
-            <el-input v-model="form.name" size="small" maxlength="12" />
-          </label>
-          <label class="forge-field forge-field-emoji">
-            <span>emoji</span>
-            <el-input v-model="form.emoji" size="small" maxlength="4" />
-          </label>
-          <label class="forge-field">
-            <span>浇水间隔（小时）</span>
-            <el-input-number v-model="form.waterIntervalH" size="small" :min="6" :max="720" :step="24" />
-          </label>
-          <label class="forge-field">
-            <span>晒太阳间隔（小时）</span>
-            <el-input-number v-model="form.sunIntervalH" size="small" :min="6" :max="720" :step="24" />
-          </label>
-        </div>
-        <label class="forge-field forge-field-wide">
-          <span>物种描述（头顶植物特征）</span>
-          <el-input v-model="form.desc" size="small" maxlength="120" />
-        </label>
-        <div class="forge-states">
-          <label v-for="f in FRAME_KEYS" :key="f" class="forge-state">
-            <span>{{ f }}</span>
-            <el-input v-model="form.states[f]" size="small" maxlength="80" />
-          </label>
-        </div>
-        <div class="forge-actions">
-          <el-button type="success" :loading="generating" @click="startGenerate">
-            开始生成 6 帧（约 1~3 分钟）
-          </el-button>
-        </div>
-      </template>
-    </div>
-
-    <div v-else-if="step === 'generate'" class="forge-body">
-      <div v-for="f in FRAME_KEYS" :key="f" class="forge-progress-row">
-        <span class="forge-progress-name">{{ f }}</span>
-        <el-tag :type="statusTag(frameStatus[f])" size="small">{{ statusText(frameStatus[f]) }}</el-tag>
+      <div class="forge-footer">
+        <span v-if="step === 'compose'" class="footer-status"
+          ><AppIcon name="key" :size="15" />{{ hasKey ? '密钥已配置' : '请先配置密钥' }}</span
+        >
+        <span v-else-if="step === 'generate' && isGenerating" class="footer-status"
+          >图片由火山方舟生成</span
+        >
+        <el-button v-else :disabled="isBusy" @click="returnToCompose">返回调整</el-button>
+        <el-button
+          v-if="step === 'compose'"
+          type="primary"
+          :disabled="!hasDraft || !hasKey || isBusy"
+          @click="startGenerate"
+          >开始生成</el-button
+        >
+        <el-button
+          v-else-if="step === 'generate'"
+          type="primary"
+          :loading="isGenerating"
+          :disabled="isBusy"
+          @click="showGallery"
+          >{{ isGenerating ? '生成中…' : hasError ? '预览并重试' : '预览确认' }}</el-button
+        >
+        <el-button
+          v-else
+          type="primary"
+          :loading="isSaving"
+          :disabled="!allDone || isBusy"
+          @click="saveToLibrary"
+          >{{ allDone ? '确认入库' : '请先补齐六帧' }}</el-button
+        >
       </div>
-      <p v-if="hasError" class="forge-hint">失败帧可在下一步点击对应图上的「重生成」重试。</p>
-      <div class="forge-actions">
-        <el-button type="primary" :disabled="generating" @click="step = 'gallery'">
-          {{ generating ? '生成中…' : hasError ? '下一步：预览并补齐失败帧' : '下一步：预览确认' }}
-        </el-button>
-      </div>
-    </div>
-
-    <div v-else class="forge-body">
-      <div class="forge-gallery">
-        <div v-for="f in FRAME_KEYS" :key="f" class="forge-cell">
-          <img v-if="frameUrls[f]" :src="frameUrls[f]" alt="" class="forge-thumb" draggable="false" />
-          <div v-else class="forge-thumb forge-thumb-empty">{{ statusText(frameStatus[f]) }}</div>
-          <div class="forge-cell-foot">
-            <span>{{ f }}</span>
-            <el-button size="small" :loading="regenerating === f" @click="regenerate(f)">
-              {{ frameStatus[f] === 'error' ? '重试' : '重生成' }}
-            </el-button>
-          </div>
-        </div>
-      </div>
-      <p class="forge-hint">提示：重生成 idle 后，建议把衍生帧也各重生成一次（它们参考的是旧 idle）。</p>
-      <div class="forge-actions">
-        <el-button type="success" :loading="saving" :disabled="!allDone" @click="saveToLibrary">
-          {{ allDone ? '确认入库（抠底 + 存本地资源库）' : '全部帧完成后可入库' }}
-        </el-button>
-      </div>
-    </div>
+    </template>
   </el-dialog>
 </template>
 
 <style scoped>
+.forge-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 16px;
+  font-weight: 650;
+}
 .forge-steps {
-  margin-bottom: 14px;
-}
-
-.forge-body {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  gap: 16px;
+  padding: 14px 0 22px;
 }
-
-.forge-row {
-  display: flex;
-  gap: 10px;
-}
-
-.forge-hint {
-  margin: 0;
-  font-size: 12px;
-  color: #909399;
-}
-
-.forge-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-}
-
-.forge-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: #606266;
-}
-
-.forge-field-emoji :deep(input) {
-  width: 64px;
-  text-align: center;
-}
-
-.forge-field-wide {
-  width: 100%;
-}
-
-.forge-states {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 14px;
-}
-
-.forge-state {
+.forge-step {
   display: flex;
   align-items: center;
+  flex: 1;
   gap: 8px;
+  color: #a1a799;
   font-size: 12px;
-  color: #606266;
+  white-space: nowrap;
 }
-
-.forge-state > span {
-  width: 52px;
-  flex-shrink: 0;
-  text-align: right;
+.forge-step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #dce0d2;
+  margin-left: 8px;
 }
-
-.forge-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 4px;
-}
-
-.forge-progress-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: #f5f7fa;
-}
-
-.forge-progress-name {
-  font-size: 13px;
+.forge-step.is-active {
+  color: #366547;
   font-weight: 600;
 }
-
-.forge-gallery {
+.step-number {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #dce0d4;
+  color: #fff;
+  font-size: 12px;
+  flex-shrink: 0;
 }
+.is-active .step-number {
+  background: #3b6f50;
+}
+.forge-body {
+  padding: 0 2px 4px;
+}
+.forge-error {
+  margin: 0 0 12px;
+  text-align: left;
+}
+.forge-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.footer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #84917b;
+}
+.forge-footer > .el-button--primary {
+  min-width: 120px;
+}
+.forge-footer :deep(.el-button) {
+  margin-left: 0;
+}
+</style>
 
-.forge-cell {
+<style>
+.species-forge {
+  padding: 22px 24px 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
-  background: #fff;
+  max-height: calc(100vh - 40px);
 }
-
-.forge-thumb {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: contain;
-  background:
-    conic-gradient(#f5f7fa 25%, #fff 0 50%, #f5f7fa 0 75%, #fff 0) 0 0 / 16px 16px;
-  border-radius: 8px;
+.species-forge .el-dialog__header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--sprout-line);
+  margin-right: 0;
+  flex-shrink: 0;
 }
-
-.forge-thumb-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #909399;
+.species-forge .el-dialog__headerbtn {
+  top: 15px;
+  right: 14px;
 }
-
-.forge-cell-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: #606266;
+.species-forge .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+.species-forge .el-dialog__footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sprout-line);
+  flex-shrink: 0;
+}
+@media (max-width: 500px) {
+  .species-forge {
+    padding: 18px;
+  }
+  .species-forge .forge-steps {
+    gap: 7px;
+  }
+  .species-forge .forge-step {
+    gap: 5px;
+    font-size: 11px;
+  }
 }
 </style>
