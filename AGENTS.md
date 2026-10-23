@@ -56,10 +56,11 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（.env 配 ARK_API_KE
 - `tauri.conf.json`：`macOSPrivateApi: true`（透明窗必需）+ Cargo 侧 `tray-icon` / `macos-private-api` feature，动配置前先理解 tauri-build 的 feature 校验
 - capability 权限名：`sql:default` 不含 `allow-execute/select`；是 `allow-get-all-windows` 不是 `allow-get-all`
 - plugin-log 必须保持 `.level(Info)`，否则 tao TRACE 日志刷屏
+- macOS 透明宠物窗偶现启动后整窗不绘制（WKWebView 已知问题 tauri#8255，官方未修；症状＝桌宠不出现，重新领养触发重绘即恢复）：`pet.ts start()` 末尾已有两次 1px 尺寸抖动兜底（`nudgeRepaint`，macOS-only，依赖 `core:window:allow-set-size` 权限）；若仍复发，下一步候选是延迟 show（`visible:false` + 就绪后 show）或 `ActivationPolicy::Accessory`（会去掉 Dock 图标，需用户拍板）
 - dev 端口 5173 被残留进程占用时：`lsof -ti:5173 | xargs kill`
 - pet 窗口热更新会整页重载（`start()` 重跑），验证日志看 `[pet]` 前缀
 - 图生图供应商可切（`scripts/sprite-config.json` 的 `imageProvider`，gen/probe 可 `--provider` 临时覆盖）：`ark`（火山方舟，正式出图）| `zeakai`（OpenAI 兼容中转站 multipart `/v1/images/edits`，开发期省成本；**仅脚本侧，面板不接**）。zeakai 在 `.env` 配 `ZEAKAI_AUTHORIZATION`（Authorization 头**原文**，无 Bearer 前缀）+ `ZEAKAI_BASE_URL`；**zeakai 有 HTTP 200 业务报错信封坑（`{"code":1003,"description":…}`），脚本已拦**。文案恒走 Ark（`ARK_API_KEY`）。ark 图片接口 `watermark` 默认 true、`output_format` 默认 jpeg，脚本与面板均已显式覆盖为关水印 + PNG；衍生帧提示词必须显式拆「脸表情 + 植物状态」两处变化（seedream 参考图服从性强，只写植物状态脸不会动）
-- 面板「AI 生成新物种」：接口走 `tauri-plugin-http`（capability 仅放行 ark 域名），素材库在 `appData/sprite-library/`（`tauri-plugin-fs`，appData 读写），两个插件锁 rustc 1.86 兼容线（http 2.8+/fs 2.7+ 需 Rust 1.90）；自定义物种经 `speciesRegistry` 与内置 4 种合并，`speciesArt` 支持运行时注册帧
+- 面板「AI 生成新物种」：接口走 `tauri-plugin-http`（capability 仅放行 ark 域名），素材库在 `appData/sprite-library/`（`tauri-plugin-fs`，appData 读写），两个插件锁 rustc 1.86 兼容线（http 2.8+/fs 2.7+ 需 Rust 1.90）；自定义物种经 `speciesRegistry` 与内置 4 种合并，`speciesArt` 支持运行时注册帧。未配密钥时弹窗显示火山方舟开通引导页（`ForgeGuide.vue`：实名 → 开通管理开模型 → 创建 API Key → 回填），外链走 `tauri-plugin-opener`（锁 `=2.5.0`，全依赖树实测过 rustc 1.86，capability 仅放行 volcengine 两域名；**scope 按 glob 匹配原始字符串，`/*` 匹配不到裸域名，裸域名要单独加精确条目**），已配密钥可从密钥卡片「查看获取教程」重开
 - **`src/assets/pets` 既有帧以仓库现状为准**：龟背竹（happy/sleep/sun）与多肉（happy/sleep/sun/thirsty/water）共 8 帧曾文件名错位、已人工改名修正；全量重跑切图会把错位还原回来覆盖修正。需要重切时用 `node scripts/process-sprites.mjs <species>` 按物种过滤（`sprite-studio commit` 已自带此过滤），不要"顺手"全量重切或按 MAP 修正这 8 帧
 - `tauri.conf.json` 配置 `plugins` 后，`generate_context!` 宏展开引用 `::serde_json` 路径，serde_json 必须是 Cargo.toml **直接依赖**（已加 `serde_json = "1"`，曾因此编译失败，删依赖会复现）
 - 本地 `pnpm tauri build`（正式包）需先 `export TAURI_SIGNING_PRIVATE_KEY=~/.tauri/plant-pet.key`，否则更新包签名阶段报错；`pnpm tauri dev` 不需要

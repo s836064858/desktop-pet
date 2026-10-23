@@ -4,7 +4,10 @@ import { readSettings, saveSettings } from '../../../lib/capabilities'
 import AppIcon from '../../common/AppIcon.vue'
 
 const props = defineProps<{ isDisabled: boolean }>()
-const emit = defineEmits<{ status: [state: { hasKey: boolean; isBusy: boolean }] }>()
+const emit = defineEmits<{
+  status: [state: { hasKey: boolean; isBusy: boolean }]
+  'show-guide': []
+}>()
 const keyInput = shallowRef('')
 const hasKey = shallowRef(false)
 const isExpanded = shallowRef(false)
@@ -115,7 +118,16 @@ onUnmounted(() => {
           >保存密钥</el-button
         >
       </form>
-      <p class="muted key-help">密钥获取：火山方舟控制台 · console.volcengine.com/ark</p>
+      <p class="muted key-help">
+        密钥来自火山方舟控制台，<el-button
+          class="key-guide-link"
+          text
+          size="small"
+          :disabled="isDisabled || isLoading || isSaving"
+          @click="emit('show-guide')"
+          >查看获取教程</el-button
+        >
+      </p>
     </div>
     <p v-if="errorMessage" class="key-feedback" role="alert">
       {{ errorMessage }}
@@ -167,6 +179,11 @@ onUnmounted(() => {
 .key-content .key-help {
   margin: 8px 0 3px;
   color: #8a927e;
+}
+.key-guide-link {
+  font-size: 11px;
+  color: #3c694e;
+  padding: 0;
 }
 .key-feedback {
   margin: 6px 0 0;

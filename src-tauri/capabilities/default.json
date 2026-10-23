@@ -8,6 +8,7 @@
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-set-always-on-top",
     "core:window:allow-set-position",
+    "core:window:allow-set-size",
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-unminimize",
@@ -34,6 +35,15 @@
       "allow": [
         { "url": "https://ark.cn-beijing.volces.com/*" },
         { "url": "https://*.tos-cn-beijing.volces.com/*" }
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://www.volcengine.com" },
+        { "url": "https://www.volcengine.com/*" },
+        { "url": "https://console.volcengine.com" },
+        { "url": "https://console.volcengine.com/*" }
       ]
     },
     "fs:allow-appdata-read-recursive",

@@ -7,12 +7,15 @@ import ForgeApiKey from './forge/ForgeApiKey.vue'
 import ForgeCompose from './forge/ForgeCompose.vue'
 import ForgeProgress from './forge/ForgeProgress.vue'
 import ForgeGallery from './forge/ForgeGallery.vue'
+import ForgeGuide from './forge/ForgeGuide.vue'
 import AppIcon from '../common/AppIcon.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; saved: [code: string] }>()
 const hasKey = shallowRef(false)
 const isKeyBusy = shallowRef(true)
+// null = 跟随默认（未配置密钥时显示引导页），true/false = 用户手动开关
+const showGuide = shallowRef<boolean | null>(null)
 const {
   form,
   step,
@@ -37,6 +40,9 @@ const {
 } = useSpeciesForge({ onSaved })
 const stepIndex = computed(() => (step.value === 'compose' ? 0 : step.value === 'generate' ? 1 : 2))
 const isBusy = computed(() => isForgeBusy.value || isKeyBusy.value)
+const guideVisible = computed(
+  () => step.value === 'compose' && (showGuide.value ?? (!hasKey.value && !isKeyBusy.value)),
+)
 
 function onSaved(code: string): void {
   emit('saved', code)
@@ -48,6 +54,13 @@ function updateForm(next: ForgeForm): void {
 function onKeyStatus(status: { hasKey: boolean; isBusy: boolean }): void {
   hasKey.value = status.hasKey
   isKeyBusy.value = status.isBusy
+  if (status.hasKey) showGuide.value = null
+}
+function openGuide(): void {
+  showGuide.value = true
+}
+function closeGuide(): void {
+  showGuide.value = false
 }
 function requestClose(done: () => void): void {
   if (isBusy.value) {
@@ -83,7 +96,7 @@ function showGallery(): void {
         <AppIcon name="sparkles" :size="20" /><span>AI 生成新物种</span>
       </div></template
     >
-    <nav class="forge-steps" aria-label="生成步骤">
+    <nav v-if="!guideVisible" class="forge-steps" aria-label="生成步骤">
       <div
         v-for="(title, index) in ['描述植物', '生成形象', '确认入库']"
         :key="title"
@@ -99,9 +112,10 @@ function showGallery(): void {
       </div>
     </nav>
     <div class="forge-body">
-      <ForgeApiKey :is-disabled="isForgeBusy" @status="onKeyStatus" />
+      <ForgeApiKey :is-disabled="isForgeBusy" @status="onKeyStatus" @show-guide="openGuide" />
+      <ForgeGuide v-if="guideVisible" @done="closeGuide" />
       <ForgeCompose
-        v-if="step === 'compose'"
+        v-else-if="step === 'compose'"
         :form="form"
         v-model:phrase="phrase"
         :has-draft="hasDraft"
@@ -133,7 +147,10 @@ function showGallery(): void {
         {{ errorMessage }}
       </p>
       <div class="forge-footer">
-        <span v-if="step === 'compose'" class="footer-status"
+        <span v-if="guideVisible" class="footer-status"
+          ><AppIcon name="key" :size="15" />按上方引导配置密钥</span
+        >
+        <span v-else-if="step === 'compose'" class="footer-status"
           ><AppIcon name="key" :size="15" />{{ hasKey ? '密钥已配置' : '请先配置密钥' }}</span
         >
         <span v-else-if="step === 'generate' && isGenerating" class="footer-status"

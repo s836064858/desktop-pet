@@ -25,5 +25,7 @@ tauri-plugin-fs = "=2.5.2"
 # 自动更新（docs/自动更新方案.md D17）：2.13.0 起 MSRV 1.90，rustc 1.86 内锁 2.12.0；
 # 传递依赖 reqwest 0.13.x MSRV ≤1.85 已核，新增 Cargo.lock 固定时先对照上两行注释
 tauri-plugin-updater = "=2.12.0"
+# AI 生成弹窗引导页打开火山方舟控制台（系统默认浏览器），全依赖树实测可过 rustc 1.86
+tauri-plugin-opener = "=2.5.0"
 # generate_context! 宏展开直接引用 ::serde_json 路径，必须是本 crate 直接依赖（tauri.conf.json 配置 plugins 后必现）
 serde_json = "1"

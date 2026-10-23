@@ -2,6 +2,7 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import type { Window } from '@tauri-apps/api/window'
 import { PhysicalPosition } from '@tauri-apps/api/dpi'
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from '@tauri-apps/plugin-autostart'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { sendNotification } from '@tauri-apps/plugin-notification'
 import { LazyStore } from '@tauri-apps/plugin-store'
 
@@ -95,4 +96,9 @@ export async function saveAffection(value: number): Promise<void> {
 
 export async function sendTaskNotification(title: string, body: string): Promise<void> {
   await sendNotification({ title, body })
+}
+
+// 引导页外链走系统默认浏览器，capability 仅放行火山引擎域名（opener:allow-open-url）
+export async function openExternalUrl(url: string): Promise<void> {
+  await openUrl(url)
 }

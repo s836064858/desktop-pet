@@ -13,6 +13,7 @@ const paths: Record<string, string> = {
   check: 'm5 12 4 4L19 6',
   moon: 'M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z',
   smile: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M8 9h.01 M16 9h.01 M8 14q4 5 8 0',
+  external: 'M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5 M15 3h6v6 M10 14 21 3',
 }
 </script>
 <template>

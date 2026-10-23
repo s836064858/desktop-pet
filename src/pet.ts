@@ -1,4 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { PhysicalSize } from '@tauri-apps/api/dpi'
 import { listen } from '@tauri-apps/api/event'
 import { Menu } from '@tauri-apps/api/menu'
 import { exit } from '@tauri-apps/plugin-process'
@@ -46,6 +47,9 @@ const MILESTONE_STEP = 10
 const HAPPY_HOLD_MS = 1600
 const WATER_HOLD_MS = 1700
 const SUN_HOLD_MS = 2100
+// 尺寸抖动的保持时长；首抖在启动末尾，第二抖覆盖首帧绘制稍晚发生的时序抖动
+const REPAINT_NUDGE_HOLD_MS = 80
+const REPAINT_NUDGE_AGAIN_MS = 1500
 
 const POKE_LINES = ['别戳啦~', '痒！', '嗯？', '晃得我头晕', '再看就把你喝掉', '咋啦？']
 const PET_LINES = ['好舒服~', '叶子亮了', '继续继续', '沙沙沙…', '开心！']
@@ -428,6 +432,8 @@ async function start() {
     showBubble(view, ADOPT_HINT)
   }
   await info(`[pet] 宠物窗就绪：${isRestored ? '已恢复上次位置' : '首次启动'}，好感度 ${affection}，调度器已启动`)
+  void nudgeRepaint()
+  setTimeout(() => void nudgeRepaint(), REPAINT_NUDGE_AGAIN_MS)
   unlistenMoved = await appWindow.onMoved((event) => {
     scheduleSave(event.payload.x, event.payload.y)
   })
@@ -435,6 +441,22 @@ async function start() {
 
 function hueOfPlant(plant: Plant): number {
   return SPECIES[plant.species_code]?.hue ?? 0
+}
+
+// macOS WKWebView 透明窗偶现首帧不绘制（tauri#8255，官方未修，shadow:false 只压了一部分）：
+// 1px 尺寸抖动强制重排重绘，与「重新领养后恢复显示」同一条自愈路径，仅启动时兜底
+async function nudgeRepaint(): Promise<void> {
+  if (!view || !navigator.userAgent.includes('Mac')) {
+    return
+  }
+  try {
+    const size = await appWindow.outerSize()
+    await appWindow.setSize(new PhysicalSize(size.width + 1, size.height))
+    await new Promise((resolve) => setTimeout(resolve, REPAINT_NUDGE_HOLD_MS))
+    await appWindow.setSize(new PhysicalSize(size.width, size.height))
+  } catch (err) {
+    await info(`[pet] 重绘抖动失败（忽略）：${String(err)}`)
+  }
 }
 
 // 自定义物种（本地资源库）：首次用到时从 appData 读取帧并注册进 speciesArt
