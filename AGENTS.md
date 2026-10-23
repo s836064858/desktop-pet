@@ -27,7 +27,7 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 
 
 - 一键发版：`pnpm release 0.2.0`（同步四处版本号 package.json / tauri.conf.json / Cargo.toml / Cargo.lock → `pnpm build` 门禁 → 提交推送 main → 打 tag 触发打包）；`pnpm release`（无参数）= 版本号已改好时只补打 tag；加 `--dry-run` 预演不落盘。脚本为 `scripts/release.mjs`，Rust 侧编译由 CI 验证
 - 三路构建：macOS arm64 原生 + macOS x86_64（交叉编译）+ Windows x64（仅 NSIS，msi 已停发见 D19）；CI 工具链锁定 rustc 1.86.0 / pnpm 9 / node 20，与本地一致，勿在 workflow 里放开
-- 自动更新：tauri-plugin-updater 锁 `=2.12.0`（2.13+ 需 rustc 1.90，见 docs/自动更新方案.md D17）；更新清单 latest.json 由 tauri-action 生成，端点 = GitHub Releases；**草稿 Release 人工 Publish 后才推给用户**；CI secrets 需配 `TAURI_SIGNING_PRIVATE_KEY`（密钥 `~/.tauri/plant-pet.key`，丢失则存量用户永久收不到更新，务必备份）与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（无口令可不配）
+- 自动更新：tauri-plugin-updater 锁 `=2.12.0`（2.13+ 需 rustc 1.90，见 docs/自动更新方案.md D17）；更新清单 latest.json 由 tauri-action 生成，端点 = GitHub Releases；**草稿 Release 人工 Publish 后才推给用户**；CI secrets 需配 `TAURI_SIGNING_PRIVATE_KEY`（密钥 `~/.tauri/plant-pet.key`，丢失则存量用户永久收不到更新，务必备份）；密钥无口令，**不要配 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secret**（GitHub UI 存不了空值，配非空值会在签名阶段报 `Wrong password for that key`）
 - 产物进**草稿 Release**，人工核对后手动发布（tag 构建核对清单见自动更新方案 §5：latest.json 三平台条目 + .sig 文件齐全）；临时试打包走 Actions 页 workflow_dispatch（产物在 run 的 Artifacts，不建 Release）
 - 包未签名：macOS 首次打开右键 →「打开」或 `xattr -cr`；Windows SmartScreen 点「仍要运行」
 
