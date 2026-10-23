@@ -1,6 +1,6 @@
 [package]
 name = "sproutkin"
-version = "0.1.0"
+version = "0.1.1-rc1"
 description = "芽伴 · Sproutkin：植物养护与桌面陪伴"
 edition = "2021"
 
