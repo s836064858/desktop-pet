@@ -9,6 +9,7 @@
 - `docs/技术方案-植物数字分身桌面宠物.md`：业务流程、分期规划、决策记录。
 - `docs/AI生图与切图管线.md`：植物素材入库流程。
 - `docs/生图自动化脚本设计.md`：素材生图自动化（`pnpm sprite`：probe/ask/gen/commit）。
+- `docs/自动更新方案.md`：自动更新（tauri-plugin-updater）方案与发布链路集成。
 - `docs/branding/品牌规范.md`：正式品牌名称与 v2 Logo 使用约定。
 
 ## 命令
@@ -25,8 +26,9 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 
 ## 发布（.github/workflows/release.yml）
 
 - 一键发版：`pnpm release 0.2.0`（同步四处版本号 package.json / tauri.conf.json / Cargo.toml / Cargo.lock → `pnpm build` 门禁 → 提交推送 main → 打 tag 触发打包）；`pnpm release`（无参数）= 版本号已改好时只补打 tag；加 `--dry-run` 预演不落盘。脚本为 `scripts/release.mjs`，Rust 侧编译由 CI 验证
-- 三路构建：macOS arm64 原生 + macOS x86_64（交叉编译）+ Windows x64（MSI/NSIS）；CI 工具链锁定 rustc 1.86.0 / pnpm 9 / node 20，与本地一致，勿在 workflow 里放开
-- 产物进**草稿 Release**，人工核对后手动发布；临时试打包走 Actions 页 workflow_dispatch（产物在 run 的 Artifacts，不建 Release）
+- 三路构建：macOS arm64 原生 + macOS x86_64（交叉编译）+ Windows x64（仅 NSIS，msi 已停发见 D19）；CI 工具链锁定 rustc 1.86.0 / pnpm 9 / node 20，与本地一致，勿在 workflow 里放开
+- 自动更新：tauri-plugin-updater 锁 `=2.12.0`（2.13+ 需 rustc 1.90，见 docs/自动更新方案.md D17）；更新清单 latest.json 由 tauri-action 生成，端点 = GitHub Releases；**草稿 Release 人工 Publish 后才推给用户**；CI secrets 需配 `TAURI_SIGNING_PRIVATE_KEY`（密钥 `~/.tauri/plant-pet.key`，丢失则存量用户永久收不到更新，务必备份）与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（无口令可不配）
+- 产物进**草稿 Release**，人工核对后手动发布（tag 构建核对清单见自动更新方案 §5：latest.json 三平台条目 + .sig 文件齐全）；临时试打包走 Actions 页 workflow_dispatch（产物在 run 的 Artifacts，不建 Release）
 - 包未签名：macOS 首次打开右键 →「打开」或 `xattr -cr`；Windows SmartScreen 点「仍要运行」
 
 ## 硬约束（违反即返工）
@@ -57,3 +59,5 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 
 - 图生图与文案统一走火山方舟 Ark（`ARK_API_KEY`，标准 HTTP 状态码）；模型/尺寸在 `scripts/sprite-config.json`。ark 图片接口 `watermark` 默认 true、`output_format` 默认 jpeg，脚本与面板均已显式覆盖为关水印 + PNG；衍生帧提示词必须显式拆「脸表情 + 植物状态」两处变化（seedream 参考图服从性强，只写植物状态脸不会动）
 - 面板「AI 生成新物种」：接口走 `tauri-plugin-http`（capability 仅放行 ark 域名），素材库在 `appData/sprite-library/`（`tauri-plugin-fs`，appData 读写），两个插件锁 rustc 1.86 兼容线（http 2.8+/fs 2.7+ 需 Rust 1.90）；自定义物种经 `speciesRegistry` 与内置 4 种合并，`speciesArt` 支持运行时注册帧
 - **`src/assets/pets` 既有帧以仓库现状为准**：龟背竹（happy/sleep/sun）与多肉（happy/sleep/sun/thirsty/water）共 8 帧曾文件名错位、已人工改名修正；全量重跑切图会把错位还原回来覆盖修正。需要重切时用 `node scripts/process-sprites.mjs <species>` 按物种过滤（`sprite-studio commit` 已自带此过滤），不要"顺手"全量重切或按 MAP 修正这 8 帧
+- `tauri.conf.json` 配置 `plugins` 后，`generate_context!` 宏展开引用 `::serde_json` 路径，serde_json 必须是 Cargo.toml **直接依赖**（已加 `serde_json = "1"`，曾因此编译失败，删依赖会复现）
+- 本地 `pnpm tauri build`（正式包）需先 `export TAURI_SIGNING_PRIVATE_KEY=~/.tauri/plant-pet.key`，否则更新包签名阶段报错；`pnpm tauri dev` 不需要

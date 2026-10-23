@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useCareStore } from '../../stores/care'
 import { usePanelSettings } from '../../composables/usePanelSettings'
+import { useUpdater } from '../../composables/useUpdater'
 import AppIcon from '../common/AppIcon.vue'
 
 const careStore = useCareStore()
@@ -16,6 +17,7 @@ const {
   changeSystemSetting,
   resetAdopted,
 } = usePanelSettings()
+const { currentVersion, phase, checkForUpdate } = useUpdater()
 const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(loadError.value))
 </script>
 
@@ -45,6 +47,21 @@ const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(l
         />
       </div>
     </div>
+    <div class="settings-row about-row">
+      <div class="setting-item">
+        <span class="setting-label">当前版本 v{{ currentVersion || '…' }}</span
+        ><el-button
+          text
+          class="update-action"
+          :loading="phase !== 'idle'"
+          :disabled="Boolean(loadError)"
+          aria-label="检查更新"
+          @click="checkForUpdate"
+          ><AppIcon v-if="phase === 'idle'" name="refresh" :size="14" /> 检查更新</el-button
+        >
+      </div>
+    </div>
+    <p class="about-hint"><AppIcon name="info" :size="14" /> 有新版本时会自动下载，完成后重启更新</p>
     <footer class="panel-footer">
       <span class="footer-hint"
         ><AppIcon name="info" :size="14" /> 关闭面板后，植物仍会陪在桌面</span
@@ -92,6 +109,23 @@ const isDisabled = computed(() => isLoading.value || isSaving.value || Boolean(l
   white-space: nowrap;
   font-size: 12px;
   color: #505b4d;
+}
+.about-row {
+  margin-top: 10px;
+}
+.about-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #8c9284;
+  margin: 8px 0 0 2px;
+}
+.update-action {
+  color: var(--sprout-accent);
+  padding-inline: 0;
+  gap: 5px;
+  font-size: 11px;
 }
 .panel-footer {
   display: flex;

@@ -42,7 +42,8 @@
   "bundle": {
     "active": true,
     "shortDescription": "芽伴 · Sproutkin：植物养护与桌面陪伴",
-    "targets": "all",
+    "targets": ["app", "dmg", "nsis"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -50,5 +51,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/s836064858/desktop-pet/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI2QzExODU5N0NENDRCMDMKUldRRFM5UjhXUmpCdHJYaUI4b3ZIQUNqY25CaFZld2o4MS9ER2NzVXg0eEtaTVBaRVYwUFVmWVAK"
+    }
   }
 }

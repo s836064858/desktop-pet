@@ -1,8 +1,25 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
 import logoUrl from './assets/brand/logo.png'
 import CarePanel from './components/care/CarePanel.vue'
 import SettingsPanel from './components/settings/SettingsPanel.vue'
 import { APP_ENGLISH_NAME, APP_NAME, APP_TAGLINE } from './config/brand'
+import { silentAutoUpdate } from './lib/updater'
+
+// 自动更新节奏（方案 D18）：启动 15s 后首查 + 每 6h 兜底；main 窗隐藏 ≠ 销毁，隐藏时照常运行
+const AUTO_CHECK_DELAY = 15 * 1000
+const AUTO_CHECK_INTERVAL = 6 * 60 * 60 * 1000
+let autoCheckTimer: number | undefined
+let autoCheckLoop: number | undefined
+
+onMounted(() => {
+  autoCheckTimer = window.setTimeout(() => void silentAutoUpdate(), AUTO_CHECK_DELAY)
+  autoCheckLoop = window.setInterval(() => void silentAutoUpdate(), AUTO_CHECK_INTERVAL)
+})
+onUnmounted(() => {
+  window.clearTimeout(autoCheckTimer)
+  window.clearInterval(autoCheckLoop)
+})
 </script>
 
 <template>

@@ -30,7 +30,7 @@ jobs:
           # macOS x86_64（arm64 runner 交叉编译，对本机 x64 产物）
           - os: macos-15
             target: x86_64-apple-darwin
-          # Windows x64（bundle.targets: all → MSI + NSIS）
+          # Windows x64（bundle.targets: dmg+nsis → Windows 仅 NSIS 渠道，D19）
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
@@ -75,6 +75,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 更新包 minisign 签名私钥（与「包未签名」无关，见 docs/自动更新方案.md §2）；
+          # 密钥无口令时 PASSWORD 可不配（密钥含口令则必须配，否则签名阶段报错）
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: 芽伴 · Sproutkin ${{ env.RELEASE_TAG }}
@@ -82,10 +86,11 @@ jobs:
             芽伴 · Sproutkin 桌面植物伙伴安装包（未签名）。
 
             - macOS arm64：Apple Silicon 原生；macOS x64：Intel 原生（Apple Silicon 也可经 Rosetta 运行 x64 包）。挂载 dmg 后将 Sproutkin.app 拖入「应用程序」。首次打开若提示“无法验证开发者”，在 app 上右键 →「打开」，或执行 `xattr -cr /Applications/Sproutkin.app`。
-            - Windows：msi 与 nsis exe 任选其一；SmartScreen 拦截时点「仍要运行」。
+            - Windows：下载 nsis exe 安装（msi 已停发，历史 msi 用户需卸载后重装一次）；SmartScreen 拦截时点「仍要运行」。
+            - 已装用户无需手动升级：应用启动后会自动检查并静默更新（草稿 Release 在手动 Publish 前不会推给用户）。
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: false
+          includeUpdaterJson: true
           args: --target ${{ matrix.target }}
 
       - name: 上传构建产物到本次运行（仅手动触发）
@@ -95,6 +100,5 @@ jobs:
           name: sproutkin-${{ matrix.target }}
           path: |
             src-tauri/target/**/bundle/dmg/*.dmg
-            src-tauri/target/**/bundle/msi/*.msi
             src-tauri/target/**/bundle/nsis/*.exe
           if-no-files-found: error

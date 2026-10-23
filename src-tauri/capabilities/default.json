@@ -21,6 +21,8 @@
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "process:allow-exit",
+    "process:allow-restart",
+    "updater:default",
     "sql:default",
     "sql:allow-execute",
     "sql:allow-select",

@@ -3,6 +3,7 @@
 //
 // 用法：
 //   pnpm release 0.2.0        # 发新版本：四处版本号统一改为 0.2.0，走完整流程
+//   pnpm release 0.2.0-rc1    # 预发布号同样支持（rc 演练自动更新链路，见 docs/自动更新方案.md §6-D）
 //   pnpm release              # 版本号已手动改好、只补打 tag（校验四处一致后才放行）
 //   任意用法加 --dry-run：只做检查并预览版本号改动，随后还原，不碰 git
 //
@@ -81,7 +82,8 @@ const versionArg = argv.find((a) => a !== '--dry-run')
 let target
 if (versionArg !== undefined) {
   target = versionArg.replace(/^v/, '')
-  if (!/^\d+\.\d+\.\d+$/.test(target)) die(`版本号 ${versionArg} 不合法，需要 x.y.z 格式`)
+  if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/.test(target))
+    die(`版本号 ${versionArg} 不合法，需要 x.y.z 或 x.y.z-rc1 预发布格式`)
 } else {
   target = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')).version
 }
