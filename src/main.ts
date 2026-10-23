@@ -6,6 +6,7 @@ import './styles/theme.css'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { attachConsole, error as logError, info } from '@tauri-apps/plugin-log'
 import App from './App.vue'
+import { initAppMenu } from './lib/appMenu'
 import { initTray } from './tray'
 
 async function guardPanelClose(): Promise<void> {
@@ -25,6 +26,8 @@ async function bootstrap() {
   app.mount('#app')
 
   await guardPanelClose()
+  const appMenu = await initAppMenu()
+  await info(`[sproutkin] 应用菜单：${appMenu.detail}`)
   const tray = await initTray()
   await info(`[sproutkin] 托盘：${tray.detail}`)
 }
