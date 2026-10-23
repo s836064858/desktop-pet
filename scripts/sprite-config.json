@@ -1,4 +1,11 @@
 {
-  "imageModel": "doubao-seedream-5-0-flash-260915",
-  "imageSize": "1024x1024"
+  "imageProvider": "zeakai",
+  "ark": {
+    "imageModel": "doubao-seedream-5-0-flash-260915",
+    "imageSize": "1024x1024"
+  },
+  "zeakai": {
+    "imageModel": "gpt-image-2.5-sunburst",
+    "imageSize": "1024x1024"
+  }
 }

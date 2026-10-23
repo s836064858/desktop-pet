@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * sprite-studio —— 植物素材生图自动化（火山方舟 Ark：图生图 + 文案）
+ * sprite-studio —— 植物素材生图自动化（图生图 ark | zeakai 可切，文案恒走火山方舟 Ark）
  * 设计文档：docs/生图自动化脚本设计.md（流程：ask → gen(idle) → 目测定稿 → gen(衍生帧) → commit）
  *
  * 子命令：
@@ -25,6 +25,7 @@ const PROMPTS_FILE = resolve(ROOT, 'scripts/sprite-prompts.json')
 const SPECIES_TS = resolve(ROOT, 'src/config/species.ts')
 
 const ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3' // 图生图 + 文本
+const ZEAKAI_DEFAULT_BASE_URL = 'https://zeakai-api.api4midjourney.com' // zeakai 中转站（图生图，OpenAI 兼容 /v1/images/edits）
 const CHAT_MODEL = 'doubao-seed-2-1-lite-260915'
 const IMAGE_TIMEOUT_MS = 120000
 const CHAT_TIMEOUT_MS = 120000 // doubao 带思考链时可能超 60s
@@ -130,13 +131,13 @@ function loadProbe() {
   }
 }
 
-async function callApi(url, init, { key, timeoutMs = IMAGE_TIMEOUT_MS, label = url }) {
+async function callApi(url, init, { auth, timeoutMs = IMAGE_TIMEOUT_MS, label = url, authHint = '请检查 Authorization 配置' }) {
   for (let attempt = 1; ; attempt++) {
     let res
     try {
       res = await fetch(url, {
         ...init,
-        headers: { ...init.headers, Authorization: `Bearer ${key}` },
+        headers: { ...init.headers, Authorization: auth },
         signal: AbortSignal.timeout(timeoutMs)
       })
     } catch (e) {
@@ -145,7 +146,7 @@ async function callApi(url, init, { key, timeoutMs = IMAGE_TIMEOUT_MS, label = u
       await sleep(BACKOFF_MS[attempt - 1])
       continue
     }
-    if (res.status === 401 || res.status === 403) throw new Error(`HTTP ${res.status} 鉴权失败：请检查 .env 的 ARK_API_KEY 是否有效`)
+    if (res.status === 401 || res.status === 403) throw new Error(`HTTP ${res.status} 鉴权失败：${authHint}`)
     if (res.status === 429 || res.status >= 500) {
       if (attempt > BACKOFF_MS.length) die(`${label} HTTP ${res.status}（重试 ${attempt - 1} 次后放弃）`)
       warn(`${label} HTTP ${res.status}，${BACKOFF_MS[attempt - 1] / 1000}s 后重试`)
@@ -222,48 +223,36 @@ function loadSpeciesCfg() {
 }
 
 // ---------- probe ----------
-async function cmdProbe() {
+async function cmdProbe(args) {
   const key = requireKey()
-  const imgCfg = loadImageConfig()
+  const target = resolveImageTarget(args, loadImageConfig())
   mkdirSync(SRC_DIR, { recursive: true })
-  const result = { checkedAt: new Date().toISOString(), imageModel: imgCfg.imageModel, imageSize: imgCfg.imageSize, chatModel: CHAT_MODEL }
+  const result = {
+    checkedAt: new Date().toISOString(),
+    imageProvider: target.provider,
+    imageModel: target.imageModel,
+    imageSize: target.imageSize,
+    chatModel: CHAT_MODEL
+  }
 
-  // —— 生图（ark seedream 图生图）：可用性 / 响应格式 ——
+  // —— 生图（当前供应商）：可用性 / 响应格式 ——
   result.image = { ok: false }
   try {
-    log('[probe] 生图接口（ark seedream）：发送最小请求（1 张，会产生少量费用）…')
-    const dataUrl = `data:image/png;base64,${solidWhitePng(64).toString('base64')}`
-    const data = await callApi(
-      `${ARK_BASE_URL}/images/generations`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: imgCfg.imageModel,
-          prompt: 'a tiny green sprout in a clay pot, flat cartoon style',
-          image: dataUrl,
-          response_format: 'url',
-          size: imgCfg.imageSize,
-          stream: false,
-          watermark: false,
-          output_format: 'png'
-        })
-      },
-      { key, timeoutMs: IMAGE_TIMEOUT_MS, label: '[probe/image]' }
+    log(`[probe] 生图接口（${target.provider}）：发送最小请求（1 张，会产生少量费用）…`)
+    const prompt = 'a tiny green sprout in a clay pot, flat cartoon style'
+    // 参考图白底：zeakai 用 512²（部分 edits 后端对输入图有最小尺寸要求），ark 64² 即可
+    const { raw, items } = await requestImage(
+      target,
+      { prompt, refBuf: solidWhitePng(target.provider === 'zeakai' ? 512 : 64), label: '[probe/image]' }
     )
     try {
-      writeFileSync(resolve(SRC_DIR, '_probe-raw.json'), JSON.stringify(data, null, 2) + '\n')
+      writeFileSync(resolve(SRC_DIR, '_probe-raw.json'), JSON.stringify(raw, null, 2) + '\n')
     } catch {
       /* 存证失败不阻塞 */
     }
-    const images = extractImages(data)
-    if (!images.length) throw new Error('生图响应解析不出图片（原始结构见 assets-src/_probe-raw.json）')
-    result.imageResponseFormat = images[0].b64_json ? 'b64_json' : 'url'
+    result.imageResponseFormat = items[0].b64_json ? 'b64_json' : 'url'
     try {
-      const buf = images[0].b64_json
-        ? Buffer.from(images[0].b64_json, 'base64')
-        : Buffer.from(await (await fetch(images[0].url, { signal: AbortSignal.timeout(60000) })).arrayBuffer())
-      writeFileSync(resolve(SRC_DIR, '_probe-image.png'), buf)
+      writeFileSync(resolve(SRC_DIR, '_probe-image.png'), await imageToPng(items[0], '[probe/image]'))
     } catch (e) {
       warn(`探测图落盘失败（不影响结论）：${e.message}`)
     }
@@ -274,6 +263,7 @@ async function cmdProbe() {
   }
 
   // —— 文本（ark Responses API）：模型可用性 / json_object ——
+  const arkAuth = { auth: `Bearer ${key}`, authHint: '请检查 .env 的 ARK_API_KEY 是否有效' }
   log('[probe] 文本接口（火山方舟 Ark）：发送最小请求…')
   const chatOnce = (jsonMode) =>
     callApi(
@@ -283,7 +273,7 @@ async function cmdProbe() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(chatBody([{ role: 'user', content: '返回一个 JSON 对象：{"ok":true}' }], jsonMode))
       },
-      { key, timeoutMs: CHAT_TIMEOUT_MS, label: '[probe/chat]' }
+      { ...arkAuth, timeoutMs: CHAT_TIMEOUT_MS, label: '[probe/chat]' }
     )
   let chat = null
   let jsonMode = true
@@ -309,10 +299,10 @@ async function cmdProbe() {
   writeFileSync(PROBE_FILE, JSON.stringify(result, null, 2) + '\n')
   log('\n== probe 结论 ==')
   if (result.image.ok) {
-    log(`  生图（ark seedream）: size=${result.imageSize}，响应格式=${result.imageResponseFormat}`)
+    log(`  生图（${result.imageProvider}）: model=${result.imageModel} size=${result.imageSize}，响应格式=${result.imageResponseFormat}`)
     log('    探测图已存证 assets-src/_probe-image.png')
   } else {
-    log(`  生图（ark seedream）: ✗ ${result.imageError || '未知原因'}`)
+    log(`  生图（${result.imageProvider}）: ✗ ${result.imageError || '未知原因'}`)
   }
   log(`  文本（Ark）         : ${CHAT_MODEL} 可用（json_object=${jsonMode ? '支持' : '不支持'}，样例可解析=${contentParses}）`)
   log(`  结论已写 ${PROBE_FILE}`)
@@ -374,7 +364,7 @@ ${examples}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(chatBody(messages, jm))
       },
-      { key, timeoutMs: CHAT_TIMEOUT_MS, label: '[ask/chat]' }
+      { auth: `Bearer ${key}`, authHint: '请检查 .env 的 ARK_API_KEY 是否有效', timeoutMs: CHAT_TIMEOUT_MS, label: '[ask/chat]' }
     )
   let draft = null
   let lastErr = null
@@ -415,16 +405,92 @@ ${examples}
 }
 
 // ---------- gen ----------
-// 图生图模型与尺寸配置（scripts/sprite-config.json，缺省用内置默认）
+// 图生图通道适配表 + 统一出图出口：供应商差异全部收口在这里，gen / probe 只调 requestImage / generateImages。
+// 新增供应商 = 加一个通道条目（endpoint / buildInit / resolve 认证），调用侧零改动。
+//   ark    火山方舟 JSON /images/generations（正式出图，质量与已入库素材同源）
+//   zeakai OpenAI 兼容中转站 multipart /v1/images/edits（开发期省成本；URL/Authorization 在 .env）
+const IMAGE_PROVIDER_DEFAULTS = {
+  ark: { imageModel: 'doubao-seedream-5-0-flash-260915', imageSize: '1024x1024' },
+  zeakai: { imageModel: 'gpt-image-2.5-sunburst', imageSize: '1024x1024' }
+}
+
+const IMAGE_CHANNELS = {
+  ark: {
+    endpoint: '/images/generations',
+    buildInit: (t, { prompt, refBuf }) => ({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: t.imageModel,
+        prompt,
+        image: `data:image/png;base64,${refBuf.toString('base64')}`,
+        response_format: 'url',
+        size: t.imageSize,
+        stream: false,
+        watermark: false, // 默认 true，必须显式关
+        output_format: 'png' // 默认 jpeg，下游切图管线只认 PNG
+      })
+    }),
+    resolve: () => ({
+      base: ARK_BASE_URL,
+      auth: `Bearer ${requireKey()}`,
+      authHint: '请检查 .env 的 ARK_API_KEY 是否有效'
+    })
+  },
+  zeakai: {
+    endpoint: '/v1/images/edits',
+    // multipart：Authorization 用 .env 配置原文（无 Bearer 前缀）；Content-Type 交给 fetch 自动带 boundary
+    buildInit: (t, { prompt, refBuf }) => {
+      const form = new FormData()
+      form.append('image', new Blob([refBuf], { type: 'image/png' }), 'ref.png')
+      form.append('prompt', prompt)
+      form.append('model', t.imageModel)
+      form.append('n', '1')
+      form.append('size', t.imageSize)
+      if (t.quality) form.append('quality', String(t.quality))
+      return { method: 'POST', headers: {}, body: form }
+    },
+    resolve: () => {
+      const auth = process.env.ZEAKAI_AUTHORIZATION
+      if (!auth) die('缺少 ZEAKAI_AUTHORIZATION：仓库根 .env 配中转站的 Authorization 原文（zeakai 文档示例无 Bearer 前缀）；非默认站还需 ZEAKAI_BASE_URL')
+      return {
+        base: String(process.env.ZEAKAI_BASE_URL || ZEAKAI_DEFAULT_BASE_URL).replace(/\/+$/, ''),
+        auth,
+        authHint: '请检查 .env 的 ZEAKAI_AUTHORIZATION / ZEAKAI_BASE_URL'
+      }
+    }
+  }
+}
+
 function loadImageConfig() {
   const file = resolve(ROOT, 'scripts/sprite-config.json')
-  const defaults = { imageModel: 'doubao-seedream-5-0-flash-260915', imageSize: '1024x1024' }
-  if (!existsSync(file)) return defaults
-  try {
-    return { ...defaults, ...JSON.parse(readFileSync(file, 'utf8')) }
-  } catch (e) {
-    die(`解析 ${file} 失败：${e.message}`)
+  const cfg = {}
+  if (existsSync(file)) {
+    try {
+      Object.assign(cfg, JSON.parse(readFileSync(file, 'utf8')))
+    } catch (e) {
+      die(`解析 ${file} 失败：${e.message}`)
+    }
   }
+  return {
+    imageProvider: cfg.imageProvider || 'ark',
+    // 兼容旧配置的顶层 imageModel/imageSize（原 ark 单供应商写法）
+    ark: {
+      ...IMAGE_PROVIDER_DEFAULTS.ark,
+      imageModel: cfg.imageModel || IMAGE_PROVIDER_DEFAULTS.ark.imageModel,
+      imageSize: cfg.imageSize || IMAGE_PROVIDER_DEFAULTS.ark.imageSize,
+      ...cfg.ark
+    },
+    zeakai: { ...IMAGE_PROVIDER_DEFAULTS.zeakai, ...cfg.zeakai }
+  }
+}
+
+// 本次生效的图生图通道：--provider 临时覆盖 > sprite-config.json imageProvider > ark
+function resolveImageTarget(args, imgCfg) {
+  const provider = String(args.flags.provider || imgCfg.imageProvider || 'ark').toLowerCase()
+  const channel = IMAGE_CHANNELS[provider]
+  if (!channel) die(`未知图生图供应商 "${provider}"（可选 ${Object.keys(IMAGE_CHANNELS).join(' / ')}）`)
+  return { provider, endpoint: channel.endpoint, ...imgCfg[provider], ...channel.resolve() }
 }
 
 const FRAME_LABELS = { idle: '平静基础态', happy: '开心', thirsty: '缺水蔫了', water: '被浇水很幸福', sun: '晒太阳', sleep: '熟睡' }
@@ -451,32 +517,59 @@ function buildPrompt(prompts, sp, frame) {
   ].join('\n')
 }
 
-// 出图入口：ark images/generations 无 n 参数（多图是"组图"语义），多候选按次数串行
-async function generateImages({ model, prompt, refPath, n, imageSize }) {
-  const key = requireKey()
-  const dataUrl = `data:image/png;base64,${readFileSync(refPath).toString('base64')}`
-  const body = {
-    model,
-    prompt,
-    image: dataUrl,
-    response_format: 'url',
-    size: imageSize,
-    stream: false,
-    watermark: false, // 默认 true，必须显式关
-    output_format: 'png' // 默认 jpeg，下游切图管线只认 PNG
+// 出图响应统一守卫：zeakai 业务信封（HTTP 200）——错误形 {"code":1003,"description":"…","result":null}，成功可能把 data 包在 result 里
+function imagesFromResponse(json, label) {
+  const hasImages = Array.isArray(json?.data) || Array.isArray(json?.result?.data)
+  if (json?.error || (!hasImages && json?.code !== undefined)) {
+    const msg = json.error?.message || json.description || JSON.stringify(json.error || json).slice(0, 200)
+    throw new Error(`${label} HTTP 200 业务报错信封：${msg}`)
   }
-  const items = []
+  const data = Array.isArray(json?.data) ? json.data : json?.result?.data
+  const one = data ? extractImages({ data }) : []
+  if (!one.length) throw new Error(`${label} 响应解析不出图片：${JSON.stringify(json).slice(0, 200)}`)
+  return one
+}
+
+// —— 生图统一出口（gen / probe 唯一入口，供应商差异全部封在 IMAGE_CHANNELS）——
+
+// 单次请求：按当前通道发一个请求，守卫解析出图片条目；原始响应带回供 probe 存证
+async function requestImage(target, { prompt, refBuf, label }) {
+  const raw = await callApi(
+    `${target.base}${target.endpoint}`,
+    IMAGE_CHANNELS[target.provider].buildInit(target, { prompt, refBuf }),
+    { auth: target.auth, timeoutMs: IMAGE_TIMEOUT_MS, label, authHint: target.authHint }
+  )
+  return { raw, items: imagesFromResponse(raw, label) }
+}
+
+// 图片条目 → PNG Buffer（b64 解码 / url 下载），校验魔数（切图管线只认 PNG）
+async function imageToPng(item, label) {
+  let buf
+  if (item?.b64_json) {
+    buf = Buffer.from(item.b64_json, 'base64')
+  } else if (item?.url) {
+    const r = await fetch(item.url, { signal: AbortSignal.timeout(60000) })
+    if (!r.ok) throw new Error(`${label} 图片下载失败 HTTP ${r.status}`)
+    buf = Buffer.from(await r.arrayBuffer())
+  } else {
+    throw new Error(`${label} 未知图片条目：${JSON.stringify(item).slice(0, 120)}`)
+  }
+  if (buf.readUInt32BE(0) !== 0x89504e47) {
+    throw new Error(`${label} 返回内容不是 PNG（切图管线只认 PNG）；请检查供应商/模型的出图格式`)
+  }
+  return buf
+}
+
+// 顶层封装：n 张候选一次拿全（各通道均按 1 张/请求串行：ark 无 n 参数；zeakai 中转站 n 行为不稳），已校验为 PNG Buffer
+async function generateImages(target, { prompt, refPath, n }) {
+  const refBuf = readFileSync(refPath)
+  const out = []
   for (let i = 0; i < n; i++) {
-    const json = await callApi(
-      `${ARK_BASE_URL}/images/generations`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-      { key, timeoutMs: IMAGE_TIMEOUT_MS, label: `[image ${i + 1}/${n}]` }
-    )
-    const one = extractImages(json)
-    if (!one.length) throw new Error(`响应解析不出图片：${JSON.stringify(json).slice(0, 200)}`)
-    items.push(...one)
+    const label = `[image ${i + 1}/${n}]`
+    const { items } = await requestImage(target, { prompt, refBuf, label })
+    for (const item of items) out.push(await imageToPng(item, label))
   }
-  return items
+  return out
 }
 
 function nextIndex(dir, frame) {
@@ -512,7 +605,7 @@ async function cmdGen(args) {
   const frames = all ? [...FRAME_KEYS] : (args.flags.frames ? String(args.flags.frames).split(',') : ['idle']).map((s) => s.trim()).filter(Boolean)
   for (const f of frames) if (!FRAME_KEYS.includes(f)) die(`未知帧 "${f}"，可选：${FRAME_KEYS.join(',')}`)
   const n = Math.max(1, Math.min(6, Number(args.flags.n) || 1)) // 出图质量稳定，默认每帧 1 张控制成本
-  const imgCfg = loadImageConfig()
+  const target = resolveImageTarget(args, loadImageConfig())
 
   const idleFinal = resolve(SRC_DIR, sp.dir, '_gen', 'idle', 'idle-FINAL.png')
   // --all 模式下衍生帧直接参考本次新生成的 idle 候选，免除人工 FINAL 定稿步骤（目检闸门仍在 commit 之前由人工执行）
@@ -535,30 +628,19 @@ async function cmdGen(args) {
     if (frame !== 'idle' && !refPath && !args.flags['dry-run']) die('内部错误：缺少 idle 参考图，请重跑')
     if (args.flags['dry-run']) {
       log(`\n[dry-run] frame=${frame} ref=${refPath || '(--all：用本次新生成的 idle 候选)'}`)
-      log(`  POST ${ARK_BASE_URL}/images/generations  model=${imgCfg.imageModel} n=${n} size=${imgCfg.imageSize}`)
+      log(`  POST ${target.base}${target.endpoint}  provider=${target.provider} model=${target.imageModel} n=${n} size=${target.imageSize}${target.quality ? ` quality=${target.quality}` : ''}`)
       log(`  prompt: ${prompt}`)
       continue
     }
-    log(`\n[gen] ${frame}：${imgCfg.imageModel} 请求 ${n} 张候选（参考图 ${basename(refPath)}）…`)
+    log(`\n[gen] ${frame}：${target.provider}/${target.imageModel} 请求 ${n} 张候选（参考图 ${basename(refPath)}）…`)
     const t0 = Date.now()
-    const items = await generateImages({ model: imgCfg.imageModel, prompt, refPath, n, imageSize: imgCfg.imageSize })
+    const buffers = await generateImages(target, { prompt, refPath, n })
     const outDir = resolve(genDir, frame)
     mkdirSync(outDir, { recursive: true })
     let idx = nextIndex(outDir, frame)
     const ms = Date.now() - t0
     let firstSaved = null
-    for (const item of items) {
-      let buf
-      if (item.b64_json) {
-        buf = Buffer.from(item.b64_json, 'base64')
-      } else if (item.url) {
-        const r = await fetch(item.url, { signal: AbortSignal.timeout(60000) })
-        if (!r.ok) die(`[gen/${frame}] 图片下载失败 HTTP ${r.status}`)
-        buf = Buffer.from(await r.arrayBuffer())
-      } else {
-        warn(`[gen/${frame}] 未知条目，跳过：${JSON.stringify(item).slice(0, 120)}`)
-        continue
-      }
+    for (const buf of buffers) {
       const file = `${frame}-${++idx}.png`
       const filePath = resolve(outDir, file)
       writeFileSync(filePath, buf)
@@ -569,8 +651,9 @@ async function cmdGen(args) {
         file,
         prompt,
         ref: refPath,
-        model: imgCfg.imageModel,
-        size: imgCfg.imageSize,
+        provider: target.provider,
+        model: target.imageModel,
+        size: target.imageSize,
         n,
         ms,
         sha256: createHash('sha256').update(buf).digest('hex').slice(0, 16),
@@ -686,13 +769,16 @@ function usage() {
 用法：
   pnpm sprite probe                          探测接口真实行为 → assets-src/_probe.json
   pnpm sprite ask <物种名或一句描述> [--write]  AI 起草物种文案 → scripts/sprite-species.json
-  pnpm sprite gen --species <code> [--all] [--frames idle,happy,…] [--n 1] [--dry-run] [--ref 路径]
+  pnpm sprite gen --species <code> [--all] [--frames idle,happy,…] [--n 1] [--dry-run] [--ref 路径] [--provider ark|zeakai]
                                              生成候选图（--all 一键生成全部 6 帧）→ assets-src/<dir>/_gen/
   pnpm sprite commit --species <code> [--write]
                                              定稿入库：规范化 + map.json + 切图 + species.ts 片段
 
-鉴权：仓库根 .env 配 ARK_API_KEY=…（图生图 + 文案，火山方舟）；模板见 .env.example
-图生图模型/尺寸：scripts/sprite-config.json（可改模型名与 imageSize）
+图生图供应商：scripts/sprite-config.json "imageProvider"（ark | zeakai），gen/probe 可用 --provider 临时覆盖
+  ark    火山方舟 /images/generations，.env 配 ARK_API_KEY
+  zeakai OpenAI 兼容中转站 /v1/images/edits（开发期省成本），.env 配 ZEAKAI_AUTHORIZATION（Authorization 原文，无 Bearer 前缀）
+         + ZEAKAI_BASE_URL（缺省 https://zeakai-api.api4midjourney.com）；仅脚本侧支持，面板不接
+文案（ask）恒走火山方舟 Ark；模型/尺寸在各供应商条目下配（zeakai 可选 quality）
 流程：ask → gen --all（一键 6 帧，默认每帧 1 张）→ 目检 → commit → 验收清单；逐帧精修用 --frames + FINAL 定稿
 `)
 }
@@ -700,7 +786,7 @@ function usage() {
 const args = parseArgs(process.argv.slice(2))
 const cmd = args._[0]
 try {
-  if (cmd === 'probe') await cmdProbe()
+  if (cmd === 'probe') await cmdProbe(args)
   else if (cmd === 'ask') await cmdAsk(args)
   else if (cmd === 'gen') await cmdGen(args)
   else if (cmd === 'commit') await cmdCommit(args)
