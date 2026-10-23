@@ -85,13 +85,29 @@ jobs:
           releaseBody: |
             芽伴 · Sproutkin 桌面植物伙伴安装包（未签名）。
 
-            - macOS arm64：Apple Silicon 原生；macOS x64：Intel 原生（Apple Silicon 也可经 Rosetta 运行 x64 包）。挂载 dmg 后将 Sproutkin.app 拖入「应用程序」。首次打开若提示“无法验证开发者”，在 app 上右键 →「打开」，或执行 `xattr -cr /Applications/Sproutkin.app`。
+            - macOS arm64：Apple Silicon 原生；macOS x64：Intel 原生（Apple Silicon 也可经 Rosetta 运行 x64 包）。挂载 dmg 后将 Sproutkin.app 拖入「应用程序」。
+            - **macOS 首次打开提示「已损坏，无法打开」/「无法验证开发者」**：文件并没有损坏，是 macOS 对未签名应用的隔离拦截。打开「系统设置 → 隐私与安全性」，滑到底部点「仍要打开」即可；或在终端执行 `xattr -d com.apple.quarantine /Applications/Sproutkin.app` 后重新打开（仅移除隔离标记）。
             - Windows：下载 nsis exe 安装（msi 已停发，历史 msi 用户需卸载后重装一次）；SmartScreen 拦截时点「仍要运行」。
             - 已装用户无需手动升级：应用启动后会自动检查并静默更新（草稿 Release 在手动 Publish 前不会推给用户）。
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
           args: --target ${{ matrix.target }}
+
+      - name: DMG 内嵌安装说明（仅 macOS；tag 构建替换 Release 资产）
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          dmg=$(ls src-tauri/target/*/release/bundle/dmg/*.dmg | head -n 1)
+          node scripts/add-dmg-notes.mjs "$dmg"
+          if [ -n "$RELEASE_TAG" ]; then
+            gh release upload "$RELEASE_TAG" "$dmg" --clobber
+          else
+            echo "手动触发：说明已写入本地 dmg，将随 Artifacts 上传"
+          fi
 
       - name: 上传构建产物到本次运行（仅手动触发）
         if: env.RELEASE_TAG == ''

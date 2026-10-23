@@ -29,7 +29,8 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（仓库根 .env 配 
 - 三路构建：macOS arm64 原生 + macOS x86_64（交叉编译）+ Windows x64（仅 NSIS，msi 已停发见 D19）；CI 工具链锁定 rustc 1.86.0 / pnpm 9 / node 20，与本地一致，勿在 workflow 里放开
 - 自动更新：tauri-plugin-updater 锁 `=2.12.0`（2.13+ 需 rustc 1.90，见 docs/自动更新方案.md D17）；更新清单 latest.json 由 tauri-action 生成，端点 = GitHub Releases；**草稿 Release 人工 Publish 后才推给用户**；CI secrets 需配 `TAURI_SIGNING_PRIVATE_KEY`（密钥 `~/.tauri/plant-pet.key`，丢失则存量用户永久收不到更新，务必备份）；密钥无口令，**不要配 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secret**（GitHub UI 存不了空值，配非空值会在签名阶段报 `Wrong password for that key`）
 - 产物进**草稿 Release**，人工核对后手动发布（tag 构建核对清单见自动更新方案 §5：latest.json 三平台条目 + .sig 文件齐全）；临时试打包走 Actions 页 workflow_dispatch（产物在 run 的 Artifacts，不建 Release）
-- 包未签名：macOS 首次打开右键 →「打开」或 `xattr -cr`；Windows SmartScreen 点「仍要运行」
+- macOS DMG 内嵌《安装说明.txt》（「已损坏」引导，改文案只改 `src-tauri/dmg/安装说明.txt`）：`scripts/add-dmg-notes.mjs` 用 hdiutil 后处理（Tauri 打包器不支持额外文件），CI 在 tauri-action 之后自动执行，tag 构建 `gh release upload --clobber` 替换资产
+- 包未签名：macOS 提示「已损坏」→ 引导「系统设置 → 隐私与安全性 → 仍要打开」或 `xattr -d com.apple.quarantine /Applications/Sproutkin.app`（**Sequoia 已移除右键打开**，文案勿再引导右键；应用内自动更新不打隔离标记，该提示只出现在浏览器下载 DMG 的首次安装）；Windows SmartScreen 点「仍要运行」
 
 ## 硬约束（违反即返工）
 

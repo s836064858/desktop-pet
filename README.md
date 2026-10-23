@@ -31,7 +31,7 @@
 3. 在桌面伙伴上悬浮显示 💧 / ☀️，点击完成对应养护；抚摸或拖动花盆与它互动。
 4. 在面板查看任务与积分，并按需开启开机自启、免打扰等设置。
 
-当前安装包未签名：macOS 挂载 DMG 后将 `Sproutkin.app` 拖入「应用程序」，首次打开可右键 →「打开」；必要时执行 `xattr -cr /Applications/Sproutkin.app`。Windows 遇到 SmartScreen 提示时选择「仍要运行」。
+当前安装包未签名：macOS 挂载 DMG 后将 `Sproutkin.app` 拖入「应用程序」，首次打开若提示「已损坏，无法打开」或「无法验证开发者」，文件并没有损坏——打开「系统设置 → 隐私与安全性」滑到底部点「仍要打开」，或在终端执行 `xattr -d com.apple.quarantine /Applications/Sproutkin.app` 后重新打开；Windows 遇到 SmartScreen 提示时选择「仍要运行」。
 
 应用内置自动更新：新版本正式发布后，已安装的用户启动应用即可自动收到更新（后台静默下载，完成后自动重启），无需重新下载安装包；也可在面板「偏好设置 → 检查更新」手动触发。
 
