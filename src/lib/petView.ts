@@ -6,10 +6,40 @@ export type BaseState = 'idle' | 'thirsty'
 
 const FALLBACK_SPECIES = 'pothos'
 
+// 未领养态：盆里还没有植物，整窗只显示空盆 idle 帧（伪物种，素材见 assets-src/空盆 + sprite-species.json 的 empty-pot）
+const UNADOPTED_SPECIES = 'empty-pot'
 let currentSpecies = FALLBACK_SPECIES
+let isUnadopted = false
 
 export function setSpeciesFrames(speciesCode: string): void {
   currentSpecies = hasSpeciesArt(speciesCode) ? speciesCode : FALLBACK_SPECIES
+}
+
+export function isUnadoptedView(): boolean {
+  return isUnadopted
+}
+
+// 进入/退出未领养态。进入时停掉瞬帧与眨眼并钉住空盆帧；退出后由调用方设置物种帧与基础态
+export function setUnadopted(view: PetViewElements, on: boolean): void {
+  isUnadopted = on
+  if (!on) {
+    return
+  }
+  if (transientTimer !== null) {
+    clearTimeout(transientTimer)
+    transientTimer = null
+  }
+  isViewBusy = false
+  if (blinkTimer !== null) {
+    clearTimeout(blinkTimer)
+    blinkTimer = null
+  }
+  const frame = getSpeciesFrame(UNADOPTED_SPECIES, 'idle')
+  if (frame) {
+    view.img.src = frame
+  }
+  view.plant.style.setProperty('--species-hue', '0deg')
+  applyStage(view, 0)
 }
 
 function frameOf(name: FrameName): string {
@@ -74,12 +104,16 @@ function applyFrame(view: PetViewElements, name: FrameName): void {
 
 export function setBaseState(view: PetViewElements, state: BaseState): void {
   baseState = state
-  if (!isViewBusy) {
-    applyFrame(view, state)
+  if (isUnadopted || isViewBusy) {
+    return
   }
+  applyFrame(view, state)
 }
 
 export async function flashFrame(view: PetViewElements, name: FrameName, holdMs: number): Promise<void> {
+  if (isUnadopted) {
+    return
+  }
   isViewBusy = true
   applyFrame(view, name)
   if (transientTimer !== null) {
@@ -165,7 +199,7 @@ function scheduleBlink(view: PetViewElements): void {
 }
 
 export function startBlink(view: PetViewElements): void {
-  if (blinkTimer !== null) {
+  if (blinkTimer !== null || isUnadopted) {
     return
   }
   scheduleBlink(view)

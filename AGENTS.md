@@ -46,6 +46,7 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（.env 配 ARK_API_KE
 - 平台：本期仅 macOS / Windows，无 iOS / Android；图标脚本仅保留 `tauri.conf.json` 引用的桌面图标，不提交移动端或未使用的 AppX 素材。
 - 品牌兼容：保留应用标识 `com.desktoppet.plantpet`、数据库 `plant-pet.db` 与配置文件 `phase0.json`，不要因更名重置已有用户数据；仓库地址仍为 `desktop-pet`。
 - 双窗口：`pet`（透明置顶常驻，调度器+互动手势+帧动画）/ `main`（面板，默认隐藏）
+- 未领养态：数据库无 plant 时宠物窗显示**空盆**（伪物种 `empty-pot`，单帧 idle，素材 `assets-src/空盆/` 经 map.json 切图，提示词条目在 `scripts/sprite-species.json`）：隐藏浇水/晒太阳按钮、不眨眼、不积好感度，互动气泡为领养引导；领养/重置经 `plant-changed` 双向切换（`petView.setUnadopted`）
 - 跨窗事件：`care-changed`（调度器每 tick 广播，面板刷新）/ `plant-changed`（领养/重置广播，宠物窗换帧 + 调度器缓存失效）
 - 计时器：调度器 15s tick（宠物窗）；互动帧切换/眨眼定时器集中在 `petView.ts`，由 `disposeViewTimers` 统一清理
 - 阶段：成熟期（默认）→ 完全体（累计完成 30 次）

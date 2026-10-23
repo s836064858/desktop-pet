@@ -1,6 +1,12 @@
 {
   "defaultRef": "assets-src/绿萝/52design-free-creation-free-media-ca0ad4d88b434874b9e03fb109e2c3d9-1792645960139.png",
   "species": {
+    "empty-pot": {
+      "dir": "空盆",
+      "name": "空花盆",
+      "emoji": "🪴",
+      "desc": "没有任何植物，盆口只露着一层浅褐色的泥土，光秃秃的"
+    },
     "pothos": {
       "dir": "绿萝",
       "name": "绿萝",

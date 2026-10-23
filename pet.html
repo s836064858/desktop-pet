@@ -38,6 +38,11 @@
         transition: opacity 0.18s ease;
       }
 
+      /* 未领养态：盆里还没有植物，不显示浇水/晒太阳入口 */
+      body.unadopted .needs {
+        display: none;
+      }
+
       #pet:hover .needs {
         opacity: 1;
         pointer-events: auto;
@@ -122,12 +127,14 @@
         transform-origin: 50% 92%;
       }
 
+      /* 拖拽热区：盆底横条（原 40% 宽）扩到全窗口宽，并向下延伸 60px 吃进 tip 行两侧空白；
+         top 边沿线保持不变（原 30% 高度处），面部/叶子留给戳与抚摸手势 */
       .drag-zone {
         position: absolute;
-        left: 30%;
-        right: 30%;
-        bottom: 0;
-        height: 30%;
+        left: -15px;
+        right: -15px;
+        bottom: -60px;
+        height: calc(30% + 60px);
         cursor: grab;
       }
 
@@ -204,7 +211,7 @@
         <img id="pet-img" class="pettable" alt="芽伴植物伙伴" draggable="false" />
         <div class="drag-zone" data-tauri-drag-region></div>
       </div>
-      <p class="tip">摸摸我 · 悬浮浇水 · 拖花盆搬家</p>
+      <p class="tip" id="tip">摸摸我 · 悬浮浇水 · 拖花盆搬家</p>
     </div>
     <script type="module" src="/src/pet.ts"></script>
   </body>

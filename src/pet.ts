@@ -23,10 +23,12 @@ import {
   disposeViewTimers,
   flashBounce,
   flashFrame,
+  isUnadoptedView,
   setBaseState,
   setNeedDue,
   setSpeciesFrames,
   setSunning,
+  setUnadopted,
   showBubble,
   spawnHearts,
   startBlink,
@@ -60,6 +62,9 @@ const CARE_FUN_LINES: Record<CareTaskType, string> = {
   sun: '刚晒过呢，休息一下~',
 }
 const DAILY_CAP_NOTE = '（今日积分已达上限 20）'
+const ADOPT_HINT = '先到面板领养一株植物吧（托盘 → 显示面板）'
+const TIP_DEFAULT = '摸摸我 · 悬浮浇水 · 拖花盆搬家'
+const TIP_UNADOPTED = '摸摸我 · 拖花盆搬家 · 去面板领养一株植物'
 
 interface StrokeState {
   isActive: boolean
@@ -96,6 +101,11 @@ function triggerPetted(): void {
   if (!view) {
     return
   }
+  if (isUnadoptedView()) {
+    flashBounce(view)
+    showBubble(view, ADOPT_HINT)
+    return
+  }
   incrementAffection()
   void info(`[pet] 抚摸 +1，好感度 ${affection}`)
   clickSuppressedUntil = Date.now() + CLICK_SUPPRESS_MS
@@ -110,7 +120,7 @@ function triggerPoked(): void {
     return
   }
   flashBounce(view)
-  showBubble(view, pickRandom(POKE_LINES))
+  showBubble(view, isUnadoptedView() ? ADOPT_HINT : pickRandom(POKE_LINES))
 }
 
 function onPettablePointerDown(event: PointerEvent): void {
@@ -236,7 +246,7 @@ function buildCareBubble(type: CareTaskType, result: CareResult): string {
 }
 
 async function runCare(type: NeedType): Promise<void> {
-  if (!view || isCaring) {
+  if (!view || isCaring || isUnadoptedView()) {
     return
   }
   const open = await getOpenTaskInfo(type)
@@ -301,6 +311,24 @@ function onDueChange(state: DueState): void {
   void info(`[pet] 需求状态：water=${state.water}, sun=${state.sun}, overdue=${state.hasOverdue}`)
 }
 
+// 未领养态的窗口 chrome：隐藏浇水/晒太阳按钮、底部队列文案换成领养引导（pet.html 按 body.unadopted 生效）
+function setAdoptedChrome(adopted: boolean): void {
+  document.body.classList.toggle('unadopted', !adopted)
+  const tip = document.getElementById('tip')
+  if (tip) {
+    tip.textContent = adopted ? TIP_DEFAULT : TIP_UNADOPTED
+  }
+}
+
+function enterUnadoptedView(): void {
+  if (!view) {
+    return
+  }
+  setUnadopted(view, true)
+  stageIndex = 0
+  setAdoptedChrome(false)
+}
+
 async function onPlantChanged(): Promise<void> {
   if (!view) {
     invalidatePlant()
@@ -309,13 +337,17 @@ async function onPlantChanged(): Promise<void> {
   const plant = await getPlant()
   if (!plant) {
     invalidatePlant()
-    showBubble(view, '先到面板领养一株植物吧（托盘 → 显示面板）')
+    enterUnadoptedView()
+    showBubble(view, ADOPT_HINT)
     return
   }
   await ensureSpeciesArt(plant.species_code)
   setSpeciesFrames(plant.species_code)
   applySpeciesHue(view, hasSpeciesArt(plant.species_code) ? 0 : hueOfPlant(plant))
+  setUnadopted(view, false)
+  setAdoptedChrome(true)
   setBaseState(view, currentBaseState)
+  startBlink(view)
   invalidatePlant()
   notifyChanged()
   showBubble(view, `${plant.nickname} 来啦！`)
@@ -381,6 +413,9 @@ async function start() {
     if (!hasSpeciesArt(plant.species_code)) {
       applySpeciesHue(view, hueOfPlant(plant))
     }
+    setAdoptedChrome(true)
+  } else {
+    enterUnadoptedView()
   }
   await syncStage()
   setBaseState(view, 'idle')
@@ -390,7 +425,7 @@ async function start() {
     void onPlantChanged()
   })
   if (!plant) {
-    showBubble(view, '先到面板领养一株植物吧（托盘 → 显示面板）')
+    showBubble(view, ADOPT_HINT)
   }
   await info(`[pet] 宠物窗就绪：${isRestored ? '已恢复上次位置' : '首次启动'}，好感度 ${affection}，调度器已启动`)
   unlistenMoved = await appWindow.onMoved((event) => {

@@ -46,5 +46,6 @@ async function getCustomPreviewUrl(code: string): Promise<string> {
 }
 
 export function builtinSpeciesCodes(): Set<string> {
-  return new Set(SPECIES_LIST.map((s) => s.code))
+  // empty-pot 是未领养态的伪物种（有帧、无配置），保留 code 不允许自定义物种占用
+  return new Set([...SPECIES_LIST.map((s) => s.code), 'empty-pot'])
 }
