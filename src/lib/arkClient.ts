@@ -45,10 +45,14 @@ async function arkPost(path: string, body: unknown, opts: ArkCallOptions, timeou
       /* 保留原文用于报错 */
     }
     if (!res.ok) {
-      const msg = (json as { error?: { message?: string }, message?: string } | null)?.error?.message
+      // 方舟错误信封 {"error":{"code","message"}}：code（如 DataInspectionFailed / ModelNotOpen）
+      // 是排查关键，必须带出，上游 operationError 按它分类提示
+      const err = (json as { error?: { code?: string, message?: string } } | null)?.error
+      const code = typeof err?.code === 'string' && err.code.trim() ? err.code.trim() : null
+      const msg = err?.message
         ?? (json as { message?: string } | null)?.message
         ?? text.slice(0, 200)
-      throw new Error(`HTTP ${res.status}：${msg}`)
+      throw new Error(`HTTP ${res.status}${code ? `（${code}）` : ''}：${msg}`)
     }
     return json
   }

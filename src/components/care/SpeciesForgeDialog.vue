@@ -238,6 +238,7 @@ function showGallery(): void {
 .forge-error {
   margin: 0 0 12px;
   text-align: left;
+  white-space: pre-line; /* 指引 + 「详情」两段式报错换行展示 */
 }
 .forge-footer {
   display: flex;

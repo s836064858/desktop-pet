@@ -28,13 +28,39 @@ function createForm(): ForgeForm {
   }
 }
 
+// 错误码对照：https://console.volcengine.com/ark/region:cn-beijing/docs/error-codes
+// 分类只认方舟 code 与 HTTP 状态，指引之外保留模型原始 message（截断），完整错误打 console
 function operationError(error: unknown): string {
-  const message = error instanceof Error ? error.message : ''
-  if (/401|403|鉴权/.test(message)) return '密钥验证失败，请在上方检查 AI 素材密钥。'
-  if (/timeout|超时|abort/i.test(message)) return '请求超时，请稍后重试，已完成的图片会保留。'
-  if (/429/.test(message)) return '请求较多，请稍后再试。'
-  if (/网络|fetch|network/i.test(message)) return '网络连接失败，请检查网络后重试。'
-  return '操作未完成，请稍后重试，已完成的图片会保留。'
+  console.error('[物种工坊] 操作失败：', error)
+  const raw = (error instanceof Error ? error.message : String(error)).trim()
+  if (!raw) return '操作未完成，请稍后重试，已完成的图片会保留。'
+  const guide = errorGuide(raw)
+  if (!guide) return truncate(raw, 300) // 本地校验类错误（如「AI 文案多次都不合规」）原文即有用
+  return `${guide}\n详情：${truncate(raw, 300)}`
+}
+
+function errorGuide(message: string): string {
+  if (/401|403|鉴权|AuthenticationFailed|InvalidAccessToken|ExpiredAccessToken|AccessDenied/.test(message))
+    return '密钥验证失败，请在上方检查 AI 素材密钥。'
+  if (/DataInspectionFailed|SensitiveContentDetected|内容审核|敏感/.test(message))
+    return '内容未通过平台安全审核，请调整植物外形或状态描述后重试。'
+  if (/ModelNotOpen|InvalidEndpointOrModel|OpenServiceRejected|未开通/.test(message))
+    return '方舟模型尚未开通，请按上方教程在控制台「开通管理」中开通所需模型。'
+  if (/429|FlowLimit|ReqThrottle|Quota/.test(message))
+    return '请求较多或配额不足，请稍后再试。'
+  if (/InvalidParameter|参数/.test(message))
+    return '请求参数未通过，通常与提示词有关，请调整描述后重试。'
+  if (/HTTP 5\d\d|InternalServiceError|ServiceUnavailable/.test(message))
+    return '生成服务暂时不可用，请稍后重试，已完成的图片会保留。'
+  if (/timeout|超时|abort/i.test(message))
+    return '请求超时，请稍后重试，已完成的图片会保留。'
+  if (/网络|fetch|network/i.test(message))
+    return '网络连接失败，请检查网络后重试。'
+  return ''
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max) + '…' : text
 }
 
 export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
