@@ -7,6 +7,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { attachConsole, error as logError, info } from '@tauri-apps/plugin-log'
 import App from './App.vue'
 import { initAppMenu } from './lib/appMenu'
+import { initAppReopen } from './lib/appReopen'
 import { initTray } from './tray'
 
 async function guardPanelClose(): Promise<void> {
@@ -19,6 +20,7 @@ async function guardPanelClose(): Promise<void> {
 }
 
 async function bootstrap() {
+  await initAppReopen()
   await attachConsole()
   const app = createApp(App)
   app.use(createPinia())

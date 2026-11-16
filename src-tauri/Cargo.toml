@@ -11,6 +11,8 @@ tauri-build = { version = "=2.6.3", features = [] }
 # rustc 升级到 ≥1.90 后可放开为 "2"（并解除 Cargo.lock 中 time/uuid 的固定），见 docs 方案 §8-R3
 [dependencies]
 tauri = { version = "=2.11.6", features = ["macos-private-api", "tray-icon"] }
+# 单实例：2.5+ 需 Rust 1.90，保持在 rustc 1.86 兼容线；仅 Rust 插件，无 npm 配套包
+tauri-plugin-single-instance = "=2.4.5"
 tauri-plugin-log = "=2.9.2"
 tauri-plugin-notification = "=2.4.0"
 tauri-plugin-process = "=2.3.1"
