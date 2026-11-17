@@ -1,8 +1,8 @@
 // 物种注册表：内置 4 物种（import.meta.glob 静态资产）+ 本地资源库自定义物种（appData 运行时生成）
 import { SPECIES_LIST } from '../config/species'
 import type { SpeciesConfig } from '../config/species'
-import { fileToObjectUrl, listCustomSpecies } from './spriteLibrary'
-import { getSpeciesPreviewUrl } from './speciesArt'
+import { listCustomSpecies, loadCustomSpeciesFrameUrls } from './spriteLibrary'
+import { getSpeciesPreviewUrl, registerCustomSpeciesFrames } from './speciesArt'
 import { readCareProfile } from './careProfile'
 
 export interface SpeciesCardItem extends SpeciesConfig {
@@ -27,8 +27,12 @@ export async function listSpeciesCards(
     options.signal?.throwIfAborted()
     let previewUrl: string | null = null
     try {
-      previewUrl = await getCustomPreviewUrl(meta.code, options.signal)
+      const frames = await loadCustomSpeciesFrameUrls(meta.code, options.signal)
+      options.signal?.throwIfAborted()
+      registerCustomSpeciesFrames(meta.code, frames)
+      previewUrl = getSpeciesPreviewUrl(meta.code)
     } catch {
+      options.signal?.throwIfAborted()
       previewUrl = null
     }
     customItems.push({
@@ -44,12 +48,6 @@ export async function listSpeciesCards(
     })
   }
   return [...builtins, ...customItems]
-}
-
-async function getCustomPreviewUrl(code: string, signal?: AbortSignal): Promise<string> {
-  const { join, appDataDir } = await import('@tauri-apps/api/path')
-  const file = await join(await appDataDir(), 'sprite-library', code, 'stage0', 'idle1.png')
-  return fileToObjectUrl(file, signal)
 }
 
 export function builtinSpeciesCodes(): Set<string> {

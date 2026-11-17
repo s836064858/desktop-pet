@@ -26,7 +26,9 @@ const previewUrl = computed(
     getSpeciesFrame(props.plant.species_code, 'idle', stage.value.code) ??
     props.species?.previewUrl,
 )
-const hasStageArt = computed(() => hasGrowthArt(props.plant.species_code))
+const hasStageArt = computed(() =>
+  hasGrowthArt(props.species?.code ?? props.plant.species_code),
+)
 const stats = computed(() => [
   { icon: 'leaf', label: '累计积分', value: props.balance, unit: '' },
   { icon: 'chart', label: '今日获得', value: props.todayEarned, unit: '/ 20' },
@@ -64,7 +66,9 @@ const stats = computed(() => [
             }}</span
             ><span
               ><strong>{{ growthDays }}</strong
-              ><template v-if="growthDays < FULL_GROWTH_DAYS"> / {{ progress.target }}</template>
+              ><template v-if="growthDays < FULL_GROWTH_DAYS">
+                / {{ progress.target }}</template
+              >
               有效养育日</span
             >
           </div>
@@ -76,10 +80,20 @@ const stats = computed(() => [
           />
         </div>
         <p class="companionship-status" :class="{ 'is-recorded': hasInteractedToday }">
-          {{ hasInteractedToday ? '今日已陪伴 · 成长已记录' : '今日待陪伴 · 去桌宠上摸摸它吧' }}
+          {{
+            hasInteractedToday
+              ? '今日已陪伴 · 成长已记录'
+              : '今日待陪伴 · 去桌宠上摸摸它吧'
+          }}
         </p>
         <p class="plant-tip">每天首次摸摸、浇水或光照自动累计成长；漏做不扣进度。</p>
-        <p v-if="!hasStageArt" class="plant-tip">阶段素材待补齐，暂用原有形象；成长会正常记录。</p>
+        <p v-if="!hasStageArt" class="plant-tip">
+          {{
+            species?.isCustom
+              ? '该物种各成长阶段共用原有形象；成长会正常记录。'
+              : '阶段素材待补齐，暂用原有形象；成长会正常记录。'
+          }}
+        </p>
       </div>
     </div>
     <div class="plant-stats">

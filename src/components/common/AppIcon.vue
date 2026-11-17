@@ -1,6 +1,17 @@
 <script setup lang="ts">
 withDefaults(defineProps<{ name: string; size?: number }>(), { size: 20 })
 const paths: Record<string, string> = {
+  image:
+    'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M3 16l5-5 4 4 3-3 6 6 M17 7h.01',
+  send: 'm21 3-7 18-4-8-8-4Z M10 13 21 3',
+  stop: 'M6 6h12v12H6Z',
+  close: 'm6 6 12 12 M6 18 18 6',
+  'arrow-right': 'M4 12h16 M14 6l6 6-6 6',
+  'chevron-down': 'm6 9 6 6 6-6',
+  sprout: 'M12 21V11 M12 14C5 15 2 10 3 5c6-1 10 3 9 9Z M12 11c0-5 4-8 9-8 1 6-3 10-9 10',
+  plant:
+    'M12 21V7 M12 16C6 17 3 14 3 10c5-1 8 1 9 6Z M12 12c0-5 3-8 8-8 1 5-2 8-8 8 M12 21c0-5 3-8 9-8 0 5-3 8-9 8',
+
   leaf: 'M20 4C10 2 3 6 4 13s12 9 16-9Z M5 19 15 9 M8 15v-4 M11 12h4',
   water: 'M12 3C10 7 5 11 5 15a7 7 0 0 0 14 0c0-4-5-8-7-12Z M8 15a4 4 0 0 0 4 4',
   sun: 'M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1.5 1.5 M17.5 17.5 19 19 M5 19l1.5-1.5 M17.5 6.5 19 5 M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',
@@ -13,7 +24,8 @@ const paths: Record<string, string> = {
   check: 'm5 12 4 4L19 6',
   moon: 'M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z',
   smile: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M8 9h.01 M16 9h.01 M8 14q4 5 8 0',
-  external: 'M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5 M15 3h6v6 M10 14 21 3',
+  external:
+    'M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5 M15 3h6v6 M10 14 21 3',
 }
 </script>
 <template>

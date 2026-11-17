@@ -1,213 +1,99 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import type { ForgeForm } from './types'
-import { FRAME_META } from './types'
-import { FRAME_KEYS } from '../../../lib/spriteStudio'
-import AppIcon from '../../common/AppIcon.vue'
-import CareProfileForm from '../CareProfileForm.vue'
+import type { PlantChatMessage } from '../../../lib/plantPlan'
+import ForgeChat from './ForgeChat.vue'
+import ForgeChatComposer from './ForgeChatComposer.vue'
+import ForgePlantPlan from './ForgePlantPlan.vue'
+import ForgeReferenceUpload from './ForgeReferenceUpload.vue'
 
-const props = defineProps<{
+defineProps<{
   form: ForgeForm
   phrase: string
+  chatMessages: PlantChatMessage[]
+  planMessageId: string
   hasDraft: boolean
+  canGenerate: boolean
+  canSend: boolean
+  canRetry: boolean
   isDrafting: boolean
+  isCancelling: boolean
   isDisabled: boolean
   hasKey: boolean
+  errorMessage: string
+  referencePreviewUrl: string
+  referenceFileName: string
+  referenceDimensions: string
+  referenceMessage: string
+  isReadingReference: boolean
 }>()
-const emit = defineEmits<{
-  'update:form': [form: ForgeForm]
+defineEmits<{
   'update:phrase': [phrase: string]
   draft: []
+  retry: []
+  generate: []
+  cancel: []
+  'select-reference': [file: File]
+  'remove-reference': []
 }>()
-const stateFields = computed(() =>
-  FRAME_KEYS.map((frame) => ({ frame, label: FRAME_META[frame].label })),
-)
-
-function updateField<K extends keyof ForgeForm>(key: K, value: ForgeForm[K]): void {
-  emit('update:form', { ...props.form, [key]: value })
-}
-function updateState(frame: keyof ForgeForm['states'], value: string): void {
-  updateField('states', { ...props.form.states, [frame]: value })
-}
 </script>
+
 <template>
-  <section>
-    <h3 class="compose-title">你想养一株什么植物？</h3>
-    <form class="phrase-row" @submit.prevent="$emit('draft')">
-      <el-input
-        :model-value="phrase"
-        aria-label="想生成的植物"
-        placeholder="例如：薰衣草，柔和的淡紫色花穗"
-        maxlength="120"
-        :disabled="isDisabled"
-        @update:model-value="$emit('update:phrase', $event)"
-      />
-      <el-button
-        class="draft-button"
-        :loading="isDrafting"
-        :disabled="isDisabled || !hasKey"
-        native-type="submit"
-        ><AppIcon name="sparkles" :size="16" />{{ hasDraft ? '重新起草' : 'AI 起草' }}</el-button
-      >
-    </form>
-    <p class="muted compose-hint">
-      {{ hasKey ? '先起草描述，确认后再生成形象。' : '先在上方配置密钥，再开始起草。' }}
-    </p>
-    <div v-if="hasDraft" class="plant-form">
-      <h3 class="form-title">植物设定</h3>
-      <div class="form-grid">
-        <label class="field-label"
-          ><span>名称</span
-          ><el-input
-            :model-value="form.name"
-            maxlength="12"
-            :disabled="isDisabled"
-            @update:model-value="updateField('name', $event)"
-        /></label>
-        <label class="field-label"
-          ><span>物种标识</span
-          ><el-input
-            :model-value="form.code"
-            placeholder="如 lavender"
-            :disabled="isDisabled"
-            @update:model-value="updateField('code', $event)"
-        /></label>
-      </div>
-      <label class="field-label description-field"
-        ><span>外形描述</span
-        ><el-input
-          :model-value="form.desc"
-          type="textarea"
-          :rows="2"
-          maxlength="120"
-          :disabled="isDisabled"
-          @update:model-value="updateField('desc', $event)"
-      /></label>
-      <details class="states-disclosure">
-        <summary>
-          <span><AppIcon name="leaf" :size="16" /> 六种状态描述</span><small>可逐项调整</small>
-        </summary>
-        <div class="state-fields">
-          <label v-for="item in stateFields" :key="item.frame" class="field-label"
-            ><span>{{ item.label }}</span
-            ><el-input
-              :model-value="form.states[item.frame]"
-              type="textarea"
-              :rows="2"
-              maxlength="100"
-              :disabled="isDisabled"
-              @update:model-value="updateState(item.frame, $event)"
-          /></label>
-        </div>
-      </details>
-      <CareProfileForm
-        :model-value="form.careProfile"
-        :is-disabled="isDisabled"
-        @update:model-value="updateField('careProfile', $event)"
-      />
-      <p class="inline-note">
-        <AppIcon name="info" :size="14" /> 习性由 AI
-        与植物设定一起起草，请核对后再生成；入库后不提供独立调整入口。
-      </p>
-    </div>
-    <div v-else class="draft-empty">
-      <AppIcon name="leaf" :size="32" />
-      <p>每一株植物，都有自己的模样</p>
-      <span>告诉 AI 你喜欢的植物，先为它写一份小档案。</span>
-    </div>
+  <section class="forge-compose">
+    <ForgeChat
+      :messages="chatMessages"
+      :plan-message-id="planMessageId"
+      :reference-preview-url="referencePreviewUrl"
+      :can-retry="canRetry"
+      :is-disabled="isDisabled"
+      :has-key="hasKey"
+      @retry="$emit('retry')"
+    >
+      <template #plan>
+        <ForgePlantPlan
+          :plan="form"
+          :is-ready="hasDraft"
+          :can-generate="canGenerate && hasKey"
+          :is-disabled="isDisabled"
+          :has-pending-changes="Boolean(phrase.trim())"
+          @generate="$emit('generate')"
+        />
+      </template>
+    </ForgeChat>
+    <ForgeChatComposer
+      :message="phrase"
+      :can-send="canSend"
+      :is-disabled="isDisabled"
+      :is-planning="isDrafting"
+      :is-reading-reference="isReadingReference"
+      :is-cancelling="isCancelling"
+      :has-key="hasKey"
+      :error-message="errorMessage"
+      :reference-message="referenceMessage"
+      @update:message="$emit('update:phrase', $event)"
+      @send="$emit('draft')"
+      @cancel="$emit('cancel')"
+    >
+      <template #attachment>
+        <ForgeReferenceUpload
+          :preview-url="referencePreviewUrl"
+          :file-name="referenceFileName"
+          :dimensions="referenceDimensions"
+          :is-disabled="isDisabled"
+          :is-loading="isReadingReference"
+          @select="$emit('select-reference', $event)"
+          @remove="$emit('remove-reference')"
+        />
+      </template>
+    </ForgeChatComposer>
   </section>
 </template>
+
 <style scoped>
-.compose-title {
-  margin: 0 0 14px;
-  font-size: 20px;
-  font-weight: 650;
-}
-.phrase-row {
+.forge-compose {
   display: flex;
-  gap: 10px;
-}
-.draft-button {
-  border-color: #8ea487;
-  color: #3c694e;
-  gap: 6px;
-}
-.compose-hint {
-  margin: 9px 0 0;
-  font-size: 11px;
-}
-.plant-form {
-  margin-top: 22px;
-  padding-top: 20px;
-  border-top: 1px solid var(--sprout-line);
-}
-.form-title {
-  font-size: 15px;
-  margin: 0 0 16px;
-}
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-.description-field {
-  margin: 16px 0;
-}
-.states-disclosure {
-  border: 1px solid var(--sprout-line);
-  border-radius: 8px;
-  padding: 11px 12px;
-}
-.states-disclosure summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  font-size: 12px;
-  list-style: none;
-}
-.states-disclosure summary::-webkit-details-marker {
-  display: none;
-}
-.states-disclosure summary span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.states-disclosure summary small {
-  color: #86917d;
-  font-size: 10px;
-}
-.states-disclosure summary small::after {
-  content: ' ›';
-}
-.states-disclosure[open] summary small::after {
-  content: ' ⌄';
-}
-.state-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 16px;
-}
-.draft-empty {
-  display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  color: #91a27d;
-  background: #f2f4ea;
-  margin-top: 24px;
-  border-radius: 16px 40px 16px 40px;
-}
-.draft-empty p {
-  font-size: 15px;
-  color: #66805b;
-}
-.draft-empty span {
-  font-size: 11px;
-  padding-inline: 16px;
-  text-align: center;
+  overflow: hidden;
 }
 </style>

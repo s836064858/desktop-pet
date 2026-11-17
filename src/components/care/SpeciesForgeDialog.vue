@@ -2,69 +2,104 @@
 import { computed, shallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSpeciesForge } from '../../composables/useSpeciesForge'
-import type { ForgeForm } from './forge/types'
 import ForgeApiKey from './forge/ForgeApiKey.vue'
 import ForgeCompose from './forge/ForgeCompose.vue'
 import ForgeProgress from './forge/ForgeProgress.vue'
 import ForgeGallery from './forge/ForgeGallery.vue'
-import ForgeGuide from './forge/ForgeGuide.vue'
+import ForgeKeyRequired from './forge/ForgeKeyRequired.vue'
+import ForgeBases from './forge/ForgeBases.vue'
+import { FRAME_KEYS, GROWTH_STAGE_KEYS } from '../../lib/spriteFrames'
 import AppIcon from '../common/AppIcon.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [value: boolean]; saved: [code: string] }>()
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean]
+  saved: [code: string]
+}>()
 const hasKey = shallowRef(false)
 const isKeyBusy = shallowRef(true)
-// null = 跟随默认（未配置密钥时显示引导页），true/false = 用户手动开关
-const showGuide = shallowRef<boolean | null>(null)
+const hasKeyReadError = shallowRef(false)
+const isKeyEditorOpen = shallowRef(false)
+const isKeyGuideOpen = shallowRef(false)
 const {
   form,
   step,
   phrase,
   hasDraft,
   isDrafting,
+  isReadingReference,
+  referencePreviewUrl,
+  referenceFileName,
+  referenceDimensions,
+  referenceMessage,
+  uploadReference,
+  removeReference,
   isGenerating,
   isSaving,
-  regeneratingFrame,
+  regeneratingTarget,
   errorMessage,
   frameStatus,
   frameUrls,
   isBusy: isForgeBusy,
   doneCount,
-  allDone,
-  hasError,
+  isAllDone,
+  isCancelling,
+  confirmedBases,
+  hasConfirmedBases,
+  frameErrors,
+  checkedCount,
+  canGenerate,
+  chatMessages,
+  planMessageId,
+  canSendPlanning,
+  canRetryPlanning,
+  retryDraft,
   startDraft,
   startGenerate,
   regenerate,
   saveToLibrary,
-  returnToCompose,
+  confirmBase,
+  startDerived,
+  cancelOperation,
+  goToStep,
 } = useSpeciesForge({ onSaved })
-const stepIndex = computed(() => (step.value === 'compose' ? 0 : step.value === 'generate' ? 1 : 2))
-const isBusy = computed(() => isForgeBusy.value || isKeyBusy.value)
-const guideVisible = computed(
-  () => step.value === 'compose' && (showGuide.value ?? (!hasKey.value && !isKeyBusy.value)),
+const stepTitles = ['对话规划', '确认主形象', '生成状态', '确认入库']
+const stepIndex = computed(() =>
+  ['compose', 'bases', 'generate', 'gallery'].indexOf(step.value),
 )
+const previewUrl = computed(() => {
+  const stage =
+    GROWTH_STAGE_KEYS.find((item) =>
+      FRAME_KEYS.some(
+        (frame) =>
+          frameStatus[item][frame] === 'running' ||
+          frameStatus[item][frame] === 'checking',
+      ),
+    ) ?? 'juvenile'
+  return frameUrls[stage].idle
+})
+const isBusy = computed(() => isForgeBusy.value || isKeyBusy.value)
 
 function onSaved(code: string): void {
   emit('saved', code)
   emit('update:modelValue', false)
 }
-function updateForm(next: ForgeForm): void {
-  Object.assign(form, next)
-}
-function onKeyStatus(status: { hasKey: boolean; isBusy: boolean }): void {
+function onKeyStatus(status: {
+  hasKey: boolean
+  isBusy: boolean
+  hasReadError: boolean
+}): void {
   hasKey.value = status.hasKey
   isKeyBusy.value = status.isBusy
-  if (status.hasKey) showGuide.value = null
-}
-function openGuide(): void {
-  showGuide.value = true
-}
-function closeGuide(): void {
-  showGuide.value = false
+  hasKeyReadError.value = status.hasReadError
 }
 function requestClose(done: () => void): void {
   if (isBusy.value) {
-    ElMessage.info('正在处理，请完成后再关闭。')
+    ElMessage.info(
+      isSaving.value
+        ? '正在入库，请完成后再关闭。'
+        : '正在处理，请先停止当前操作再关闭。',
+    )
     return
   }
   done()
@@ -73,16 +108,14 @@ function onVisibleChange(value: boolean): void {
   if (!value && isBusy.value) return
   emit('update:modelValue', value)
 }
-function showGallery(): void {
-  if (!isBusy.value) step.value = 'gallery'
-}
 </script>
 
 <template>
   <el-dialog
     :model-value="props.modelValue"
     class="species-forge"
-    width="min(640px, calc(100vw - 40px))"
+    :class="{ 'is-conversation': step === 'compose' }"
+    width="min(780px, calc(100vw - 40px))"
     align-center
     append-to-body
     :close-on-click-modal="false"
@@ -91,45 +124,88 @@ function showGallery(): void {
     :before-close="requestClose"
     @update:model-value="onVisibleChange"
   >
-    <template #header
-      ><div class="forge-title">
-        <AppIcon name="sparkles" :size="20" /><span>AI 生成新物种</span>
-      </div></template
-    >
-    <nav v-if="!guideVisible" class="forge-steps" aria-label="生成步骤">
-      <div
-        v-for="(title, index) in ['描述植物', '生成形象', '确认入库']"
-        :key="title"
-        class="forge-step"
-        :class="{ 'is-active': index <= stepIndex }"
-        :aria-current="index === stepIndex ? 'step' : undefined"
-      >
-        <span class="step-number"
-          ><AppIcon v-if="index < stepIndex" name="check" :size="14" /><template v-else>{{
-            index + 1
-          }}</template></span
-        ><span>{{ title }}</span>
+    <template #header>
+      <div class="forge-heading">
+        <div class="forge-title">
+          <AppIcon name="leaf" :size="25" /><span>AI 创建植物</span>
+        </div>
+        <ForgeApiKey
+          v-model:is-open="isKeyEditorOpen"
+          v-model:is-guide-open="isKeyGuideOpen"
+          :is-disabled="isForgeBusy"
+          @status="onKeyStatus"
+        />
       </div>
-    </nav>
+      <p v-if="step === 'compose'" class="forge-subtitle">
+        聊聊你的植物，一起创造它的数字分身
+      </p>
+      <nav class="forge-steps" aria-label="生成步骤">
+        <div
+          v-for="(title, index) in stepTitles"
+          :key="title"
+          class="forge-step"
+          :class="{ 'is-active': index <= stepIndex }"
+          :aria-current="index === stepIndex ? 'step' : undefined"
+        >
+          <span class="step-number"
+            ><AppIcon v-if="index < stepIndex" name="check" :size="14" /><template
+              v-else
+              >{{ index + 1 }}</template
+            ></span
+          ><span>{{ title }}</span>
+        </div>
+      </nav>
+    </template>
     <div class="forge-body">
-      <ForgeApiKey :is-disabled="isForgeBusy" @status="onKeyStatus" @show-guide="openGuide" />
-      <ForgeGuide v-if="guideVisible" @done="closeGuide" />
+      <ForgeKeyRequired
+        v-if="step === 'compose' && !hasKey"
+        :is-loading="isKeyBusy"
+        :has-read-error="hasKeyReadError"
+        @configure="isKeyEditorOpen = true"
+        @show-guide="isKeyGuideOpen = true"
+      />
       <ForgeCompose
         v-else-if="step === 'compose'"
         :form="form"
         v-model:phrase="phrase"
         :has-draft="hasDraft"
+        :plan-message-id="planMessageId"
+        :can-generate="canGenerate"
+        :is-cancelling="isCancelling"
+        :error-message="errorMessage"
+        :chat-messages="chatMessages"
+        :can-send="canSendPlanning"
+        :can-retry="canRetryPlanning"
         :is-drafting="isDrafting"
         :is-disabled="isBusy"
         :has-key="hasKey"
-        @update:form="updateForm"
+        :reference-preview-url="referencePreviewUrl"
+        :reference-file-name="referenceFileName"
+        :reference-dimensions="referenceDimensions"
+        :reference-message="referenceMessage"
+        :is-reading-reference="isReadingReference"
         @draft="startDraft"
+        @retry="retryDraft"
+        @generate="startGenerate"
+        @cancel="cancelOperation"
+        @select-reference="uploadReference"
+        @remove-reference="removeReference"
+      />
+      <ForgeBases
+        v-else-if="step === 'bases'"
+        :frame-urls="frameUrls"
+        :frame-status="frameStatus"
+        :confirmed-bases="confirmedBases"
+        :frame-errors="frameErrors"
+        :is-disabled="isBusy"
+        @confirm="confirmBase"
+        @regenerate="regenerate"
       />
       <ForgeProgress
         v-else-if="step === 'generate'"
         :name="form.name"
         :frame-status="frameStatus"
-        :preview-url="frameUrls.idle"
+        :preview-url="previewUrl"
         :done-count="doneCount"
         :is-generating="isGenerating"
       />
@@ -137,48 +213,68 @@ function showGallery(): void {
         v-else
         :frame-urls="frameUrls"
         :frame-status="frameStatus"
-        :regenerating-frame="regeneratingFrame"
+        :regenerating-target="regeneratingTarget"
+        :frame-errors="frameErrors"
+        :checked-count="checkedCount"
         :is-disabled="isBusy"
         @regenerate="regenerate"
       />
     </div>
-    <template #footer>
+    <template v-if="step !== 'compose'" #footer>
       <p v-if="errorMessage" class="inline-note error-note forge-error" role="alert">
         {{ errorMessage }}
       </p>
       <div class="forge-footer">
-        <span v-if="guideVisible" class="footer-status"
-          ><AppIcon name="key" :size="15" />按上方引导配置密钥</span
-        >
-        <span v-else-if="step === 'compose'" class="footer-status"
-          ><AppIcon name="key" :size="15" />{{ hasKey ? '密钥已配置' : '请先配置密钥' }}</span
-        >
-        <span v-else-if="step === 'generate' && isGenerating" class="footer-status"
-          >图片由火山方舟生成</span
-        >
-        <el-button v-else :disabled="isBusy" @click="returnToCompose">返回调整</el-button>
         <el-button
-          v-if="step === 'compose'"
+          v-if="isForgeBusy && !isSaving"
+          :loading="isCancelling"
+          :disabled="isCancelling"
+          @click="cancelOperation"
+          >{{
+            isReadingReference ? '停止读取' : isDrafting ? '停止对话' : '停止生成'
+          }}</el-button
+        >
+        <el-button v-else :disabled="isBusy" @click="goToStep('compose')"
+          >返回调整</el-button
+        >
+        <el-button
+          v-if="step === 'bases'"
           type="primary"
-          :disabled="!hasDraft || !hasKey || isBusy"
-          @click="startGenerate"
-          >开始生成</el-button
+          :loading="isGenerating"
+          :disabled="!hasConfirmedBases || isBusy"
+          @click="startDerived"
+          >{{ hasConfirmedBases ? '生成互动状态' : '请确认三个形象' }}</el-button
+        >
+        <el-button v-else-if="step === 'generate' && !isBusy" @click="startDerived"
+          >继续补齐</el-button
         >
         <el-button
-          v-else-if="step === 'generate'"
+          v-if="step === 'generate'"
           type="primary"
           :loading="isGenerating"
           :disabled="isBusy"
-          @click="showGallery"
-          >{{ isGenerating ? '生成中…' : hasError ? '预览并重试' : '预览确认' }}</el-button
+          @click="goToStep('gallery')"
+          >{{ isGenerating ? '生成中…' : '预览并重试' }}</el-button
         >
         <el-button
-          v-else
+          v-if="step === 'gallery' && doneCount < 18"
+          :disabled="isBusy"
+          @click="startDerived"
+          >补齐缺失状态</el-button
+        >
+        <el-button
+          v-if="step === 'gallery'"
           type="primary"
           :loading="isSaving"
-          :disabled="!allDone || isBusy"
+          :disabled="!isAllDone || isBusy"
           @click="saveToLibrary"
-          >{{ allDone ? '确认入库' : '请先补齐六帧' }}</el-button
+          >{{
+            isAllDone
+              ? '确认入库'
+              : doneCount < 18
+                ? '请先补齐18帧'
+                : `检查通过 ${checkedCount}/18 帧`
+          }}</el-button
         >
       </div>
     </template>
@@ -186,17 +282,30 @@ function showGallery(): void {
 </template>
 
 <style scoped>
+.forge-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 32px;
+}
 .forge-title {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 650;
+}
+.forge-subtitle {
+  margin: 7px 0 0 34px;
+  color: #8a9580;
+  font-size: 11px;
+  line-height: 1.7;
 }
 .forge-steps {
   display: flex;
   gap: 16px;
-  padding: 14px 0 22px;
+  padding: 22px 0 4px;
 }
 .forge-step {
   display: flex;
@@ -245,13 +354,7 @@ function showGallery(): void {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-}
-.footer-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
-  color: #84917b;
+  flex-wrap: wrap;
 }
 .forge-footer > .el-button--primary {
   min-width: 120px;
@@ -267,6 +370,9 @@ function showGallery(): void {
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 40px);
+}
+.species-forge.is-conversation {
+  height: min(860px, calc(100vh - 40px));
 }
 .species-forge .el-dialog__header {
   padding-bottom: 14px;
@@ -284,6 +390,20 @@ function showGallery(): void {
   overflow-y: auto;
   padding-right: 3px;
 }
+.species-forge.is-conversation .el-dialog__body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 8px;
+  padding-bottom: 0;
+}
+.species-forge.is-conversation .forge-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 0;
+}
 .species-forge .el-dialog__footer {
   margin-top: 18px;
   padding-top: 16px;
@@ -299,7 +419,14 @@ function showGallery(): void {
   }
   .species-forge .forge-step {
     gap: 5px;
-    font-size: 11px;
+    font-size: 10px;
+  }
+  .species-forge .step-number {
+    width: 20px;
+    height: 20px;
+  }
+  .species-forge .forge-step:not(:last-child)::after {
+    display: none;
   }
 }
 </style>

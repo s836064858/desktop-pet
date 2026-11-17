@@ -1,14 +1,17 @@
 import type { FrameName } from '../../../lib/speciesArt'
 import type { CareProfile } from '../../../lib/careProfile'
+import type { GrowthDescriptions, GrowthFrames } from '../../../lib/spriteFrames'
 
-export type ForgeStep = 'compose' | 'generate' | 'gallery'
-export type FrameStatus = 'pending' | 'running' | 'done' | 'error'
+export type ForgeStep = 'compose' | 'bases' | 'generate' | 'gallery'
+export type FrameStatus = 'pending' | 'running' | 'checking' | 'done' | 'error'
+export type GrowthFrameStatus = GrowthFrames<FrameStatus>
 export interface ForgeForm {
   code: string
   name: string
   emoji: string
   desc: string
   states: Record<FrameName, string>
+  stages: GrowthDescriptions
   careProfile: CareProfile
 }
 export const FRAME_META: Record<FrameName, { label: string; icon: string }> = {
@@ -22,6 +25,7 @@ export const FRAME_META: Record<FrameName, { label: string; icon: string }> = {
 export const FRAME_STATUS_LABELS: Record<FrameStatus, string> = {
   pending: '等待',
   running: '生成中',
-  done: '完成',
-  error: '生成失败',
+  checking: '自动检查',
+  done: '检查通过',
+  error: '生成或检查失败',
 }

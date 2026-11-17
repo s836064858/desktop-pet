@@ -6,7 +6,11 @@ import AppIcon from '../common/AppIcon.vue'
 import CareProfileForm from './CareProfileForm.vue'
 import { createCareProfile } from '../../lib/careProfile'
 
-const props = defineProps<{ species: SpeciesCardItem[]; isLoading: boolean; error: string }>()
+const props = defineProps<{
+  species: SpeciesCardItem[]
+  isLoading: boolean
+  error: string
+}>()
 defineEmits<{ forge: []; retry: [] }>()
 const careStore = useCareStore()
 const selectedCode = shallowRef('')
@@ -60,14 +64,16 @@ async function submitAdopt(): Promise<void> {
         <p class="muted">按时照顾，慢慢长大。每一株都有自己的模样。</p>
       </div>
       <el-button class="forge-entry" :disabled="isAdopting" @click="$emit('forge')"
-        ><AppIcon name="sparkles" :size="16" /> AI 生成新物种</el-button
+        ><AppIcon name="sparkles" :size="16" /> AI 创建植物</el-button
       >
     </div>
     <p v-if="error" class="inline-note error-note" role="alert">
       {{ error }} <el-button text @click="$emit('retry')">重新加载</el-button>
     </p>
     <el-skeleton v-else-if="isLoading" :rows="3" animated />
-    <p v-else-if="!species.length" class="inline-note">还没有可用物种，可以先用 AI 生成一株。</p>
+    <p v-else-if="!species.length" class="inline-note">
+      还没有可用物种，可以先用 AI 生成一株。
+    </p>
     <div v-else class="species-grid" aria-label="选择植物">
       <button
         v-for="item in species"
@@ -84,16 +90,24 @@ async function submitAdopt(): Promise<void> {
         /></span>
         <img v-if="item.previewUrl" :src="item.previewUrl" alt="" draggable="false" />
         <span v-else class="species-placeholder">{{ item.emoji }}</span>
-        <span class="species-name">{{ item.name }} <small v-if="item.isCustom">AI</small></span>
+        <span class="species-name"
+          >{{ item.name }} <small v-if="item.isCustom">AI</small></span
+        >
       </button>
     </div>
-    <CareProfileForm v-if="selectedSpecies" v-model="careProfile" :is-disabled="isAdopting" />
+    <CareProfileForm
+      v-if="selectedSpecies"
+      v-model="careProfile"
+      :is-disabled="isAdopting"
+    />
     <form class="adopt-form" @submit.prevent="submitAdopt">
       <label class="field-label name-field"
         ><span>给它起个名字</span
         ><el-input
           v-model="nickname"
-          :placeholder="selectedSpecies ? '默认：' + selectedSpecies.name : '先选一株植物吧'"
+          :placeholder="
+            selectedSpecies ? '默认：' + selectedSpecies.name : '先选一株植物吧'
+          "
           maxlength="12"
           :disabled="isAdopting"
       /></label>
@@ -106,7 +120,8 @@ async function submitAdopt(): Promise<void> {
       >
     </form>
     <p class="muted">
-      确认领养也会保存上述习性。每天首次摸摸、浇水或光照自动累计成长，14 日成年、累计 42 日完全体。
+      确认领养也会保存上述习性。每天首次摸摸、浇水或光照自动累计成长，14 日成年、累计 42
+      日完全体。
     </p>
     <p v-if="formError" class="inline-note error-note" role="alert">{{ formError }}</p>
   </section>

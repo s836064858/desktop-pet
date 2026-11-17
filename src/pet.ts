@@ -585,7 +585,7 @@ async function ensureSpeciesArt(code: string): Promise<void> {
   try {
     const frames = await loadCustomSpeciesFrameUrls(code, resourcesController.signal)
     if (isDisposed) return
-    if (Object.keys(frames).length > 0) {
+    if (frames.juvenile?.idle || frames.stage0?.idle) {
       registerCustomSpeciesFrames(code, frames)
       registeredCustom.add(code)
       await info(`[pet] 已加载自定义物种帧：${code}`)

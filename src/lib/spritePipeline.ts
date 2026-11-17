@@ -14,7 +14,8 @@ for (let n = 0; n < 256; n++) {
 
 function crc32(buf: Uint8Array): number {
   let c = 0xffffffff
-  for (let i = 0; i < buf.length; i++) c = (CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8)) >>> 0
+  for (let i = 0; i < buf.length; i++)
+    c = (CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8)) >>> 0
   return (c ^ 0xffffffff) >>> 0
 }
 
@@ -43,7 +44,9 @@ async function zlibDeflate(data: Uint8Array): Promise<Uint8Array> {
   if (typeof CompressionStream === 'undefined') {
     throw new Error('当前 WebView 不支持 CompressionStream，无法编码 PNG')
   }
-  const stream = new Blob([data as BlobPart]).stream().pipeThrough(new CompressionStream('deflate'))
+  const stream = new Blob([data as BlobPart])
+    .stream()
+    .pipeThrough(new CompressionStream('deflate'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
@@ -51,7 +54,9 @@ async function zlibInflate(data: Uint8Array): Promise<Uint8Array> {
   if (typeof DecompressionStream === 'undefined') {
     throw new Error('当前 WebView 不支持 DecompressionStream，无法解码 PNG')
   }
-  const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate'))
+  const stream = new Blob([data as BlobPart])
+    .stream()
+    .pipeThrough(new DecompressionStream('deflate'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
@@ -73,7 +78,12 @@ export async function decodePng(buffer: Uint8Array): Promise<RawImage> {
   let offset = 8
   while (offset + 8 <= buffer.length) {
     const length = dv.getUint32(offset)
-    const type = String.fromCharCode(buffer[offset + 4], buffer[offset + 5], buffer[offset + 6], buffer[offset + 7])
+    const type = String.fromCharCode(
+      buffer[offset + 4],
+      buffer[offset + 5],
+      buffer[offset + 6],
+      buffer[offset + 7],
+    )
     const data = buffer.subarray(offset + 8, offset + 8 + length)
     if (type === 'IHDR') {
       width = dv.getUint32(offset + 8)
@@ -135,7 +145,11 @@ function paeth(a: number, b: number, c: number): number {
 }
 
 function isNearWhite(rgba: Uint8Array, i: number): boolean {
-  return rgba[i] >= 255 - WHITE_TOL && rgba[i + 1] >= 255 - WHITE_TOL && rgba[i + 2] >= 255 - WHITE_TOL
+  return (
+    rgba[i] >= 255 - WHITE_TOL &&
+    rgba[i + 1] >= 255 - WHITE_TOL &&
+    rgba[i + 2] >= 255 - WHITE_TOL
+  )
 }
 
 function removeWhiteBackground(rgba: Uint8Array, width: number, height: number): void {
@@ -178,16 +192,31 @@ function featherEdges(rgba: Uint8Array, width: number, height: number): void {
       const index = y * width + x
       if (alphaCopy[index] === 0) continue
       const p = index * 4
-      const neighbours = [alphaCopy[index - 1], alphaCopy[index + 1], alphaCopy[index - width], alphaCopy[index + width]]
+      const neighbours = [
+        alphaCopy[index - 1],
+        alphaCopy[index + 1],
+        alphaCopy[index - width],
+        alphaCopy[index + width],
+      ]
       const transparentNeighbours = neighbours.filter((a) => a === 0).length
-      if (transparentNeighbours >= 2 && rgba[p] > 200 && rgba[p + 1] > 200 && rgba[p + 2] > 200) {
+      if (
+        transparentNeighbours >= 2 &&
+        rgba[p] > 200 &&
+        rgba[p + 1] > 200 &&
+        rgba[p + 2] > 200
+      ) {
         rgba[p + 3] = 150
       }
     }
   }
 }
 
-function resizeBilinear(rgba: Uint8Array, width: number, height: number, target: number): Uint8Array {
+function resizeBilinear(
+  rgba: Uint8Array,
+  width: number,
+  height: number,
+  target: number,
+): Uint8Array {
   const out = new Uint8Array(target * target * 4)
   for (let y = 0; y < target; y++) {
     const sy = ((y + 0.5) * height) / target - 0.5
@@ -200,8 +229,12 @@ function resizeBilinear(rgba: Uint8Array, width: number, height: number, target:
       const x1 = Math.min(width - 1, x0 + 1)
       const fx = sx - x0
       for (let c = 0; c < 4; c++) {
-        const top = rgba[(y0 * width + x0) * 4 + c] * (1 - fx) + rgba[(y0 * width + x1) * 4 + c] * fx
-        const bottom = rgba[(y1 * width + x0) * 4 + c] * (1 - fx) + rgba[(y1 * width + x1) * 4 + c] * fx
+        const top =
+          rgba[(y0 * width + x0) * 4 + c] * (1 - fx) +
+          rgba[(y0 * width + x1) * 4 + c] * fx
+        const bottom =
+          rgba[(y1 * width + x0) * 4 + c] * (1 - fx) +
+          rgba[(y1 * width + x1) * 4 + c] * fx
         out[(y * target + x) * 4 + c] = Math.round(top * (1 - fy) + bottom * fy)
       }
     }
@@ -209,7 +242,11 @@ function resizeBilinear(rgba: Uint8Array, width: number, height: number, target:
   return out
 }
 
-export async function encodePng(rgba: Uint8Array, width: number, height: number): Promise<Uint8Array> {
+export async function encodePng(
+  rgba: Uint8Array,
+  width: number,
+  height: number,
+): Promise<Uint8Array> {
   const ihdr = new Uint8Array(13)
   const dv = new DataView(ihdr.buffer)
   dv.setUint32(0, width)
@@ -223,14 +260,25 @@ export async function encodePng(rgba: Uint8Array, width: number, height: number)
     raw.set(rgba.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1)
   }
   const idat = await zlibDeflate(raw)
-  return concat([PNG_SIGNATURE, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', new Uint8Array(0))])
+  return concat([
+    PNG_SIGNATURE,
+    chunk('IHDR', ihdr),
+    chunk('IDAT', idat),
+    chunk('IEND', new Uint8Array(0)),
+  ])
 }
 
 /** 抠白底 + 羽化 + 归一 400×400 + PNG 编码，产出可直接入库的透明底素材 */
 export async function processSpritePng(png: Uint8Array): Promise<Uint8Array> {
+  const { width, height, rgba } = await prepareSpritePng(png)
+  const out = resizeBilinear(rgba, width, height, TARGET)
+  return encodePng(out, TARGET, TARGET)
+}
+
+/** 保留原始坐标，供自动检测花盆、脚底与归一化使用。 */
+export async function prepareSpritePng(png: Uint8Array): Promise<RawImage> {
   const { width, height, rgba } = await decodePng(png)
   removeWhiteBackground(rgba, width, height)
   featherEdges(rgba, width, height)
-  const out = resizeBilinear(rgba, width, height, TARGET)
-  return encodePng(out, TARGET, TARGET)
+  return { width, height, rgba }
 }

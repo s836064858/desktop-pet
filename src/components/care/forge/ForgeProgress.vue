@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { FRAME_KEYS } from '../../../lib/spriteStudio'
-import type { FrameName } from '../../../lib/speciesArt'
-import type { FrameStatus } from './types'
+import { GROWTH_STAGE_KEYS, GROWTH_STAGE_LABELS } from '../../../lib/spriteFrames'
+import type { GrowthFrameStatus } from './types'
 import { FRAME_META, FRAME_STATUS_LABELS } from './types'
 import AppIcon from '../../common/AppIcon.vue'
 
 const props = defineProps<{
   name: string
-  frameStatus: Record<FrameName, FrameStatus>
+  frameStatus: GrowthFrameStatus
   previewUrl?: string
   doneCount: number
   isGenerating: boolean
 }>()
-const progress = computed(() => Math.round((props.doneCount / FRAME_KEYS.length) * 100))
+const progress = computed(() => Math.round((props.doneCount / 18) * 100))
 </script>
 <template>
   <section class="generation" aria-live="polite">
     <h3>{{ isGenerating ? '正在绘制你的' : '你的植物形象' }}{{ name }}</h3>
-    <p class="muted">先生成基础形象，再依次生成其余状态</p>
+    <p class="muted">以已确认主形象生成互动状态，每帧自动检测、对齐并复检</p>
     <div class="generation-preview">
       <img v-if="previewUrl" :src="previewUrl" :alt="name" draggable="false" />
       <div v-else class="preview-wait">
@@ -28,26 +28,43 @@ const progress = computed(() => Math.round((props.doneCount / FRAME_KEYS.length)
       </div>
     </div>
     <div class="generation-progress">
-      <el-progress :percentage="progress" :show-text="false" :stroke-width="8" color="#c87955" />
-      <p>已完成 {{ doneCount }} / 6 帧</p>
+      <el-progress
+        :percentage="progress"
+        :show-text="false"
+        :stroke-width="8"
+        color="#c87955"
+      />
+      <p>已完成 {{ doneCount }} / 18 帧</p>
     </div>
-    <div class="status-grid">
-      <div v-for="frame in FRAME_KEYS" :key="frame" class="frame-status">
-        <span class="status-name"
-          ><AppIcon :name="FRAME_META[frame].icon" :size="18" />{{ FRAME_META[frame].label }}</span
-        ><span class="status-value" :class="'status-' + frameStatus[frame]"
-          ><AppIcon v-if="frameStatus[frame] === 'done'" name="check" :size="14" /><i
-            v-else-if="frameStatus[frame] === 'running'"
-            class="loading-ring"
-          />{{ FRAME_STATUS_LABELS[frameStatus[frame]] }}</span
-        >
+    <section v-for="stage in GROWTH_STAGE_KEYS" :key="stage" class="stage-progress">
+      <h4 class="stage-title">{{ GROWTH_STAGE_LABELS[stage] }}</h4>
+      <div class="status-grid">
+        <div v-for="frame in FRAME_KEYS" :key="frame" class="frame-status">
+          <span class="status-name"
+            ><AppIcon :name="FRAME_META[frame].icon" :size="18" />{{
+              FRAME_META[frame].label
+            }}</span
+          ><span class="status-value" :class="'status-' + frameStatus[stage][frame]"
+            ><AppIcon
+              v-if="frameStatus[stage][frame] === 'done'"
+              name="check"
+              :size="14"
+            /><i
+              v-else-if="
+                frameStatus[stage][frame] === 'running' ||
+                frameStatus[stage][frame] === 'checking'
+              "
+              class="loading-ring"
+            />{{ FRAME_STATUS_LABELS[frameStatus[stage][frame] ?? 'pending'] }}</span
+          >
+        </div>
       </div>
-    </div>
+    </section>
     <p class="inline-note generation-note">
       <AppIcon name="info" :size="14" />{{
         isGenerating
-          ? '生成需要一些时间，请保持窗口打开。'
-          : '已完成的图片会保留，失败帧可在预览中单独重试。'
+          ? '生成需要一些时间，可随时停止；已完成的图片保留在本次窗口中。'
+          : '可继续补齐缺失状态，或进入预览单独重试。关闭窗口会丢弃未入库图片。'
       }}
     </p>
   </section>
@@ -98,6 +115,14 @@ const progress = computed(() => Math.round((props.doneCount / FRAME_KEYS.length)
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+.stage-progress + .stage-progress {
+  margin-top: 14px;
+}
+.stage-title {
+  margin: 0 0 8px;
+  color: #526b48;
+  font-size: 12px;
+}
 .frame-status {
   display: flex;
   align-items: center;
@@ -126,7 +151,8 @@ const progress = computed(() => Math.round((props.doneCount / FRAME_KEYS.length)
 .status-error {
   color: #b36347;
 }
-.status-running {
+.status-running,
+.status-checking {
   color: #b6784e;
 }
 .generation-note {

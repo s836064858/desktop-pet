@@ -29,7 +29,12 @@ interface ArkCallOptions {
   signal?: AbortSignal
 }
 
-async function requestOnce(path: string, body: unknown, opts: ArkCallOptions, timeoutMs: number) {
+async function requestOnce(
+  path: string,
+  body: unknown,
+  opts: ArkCallOptions,
+  timeoutMs: number,
+) {
   opts.signal?.throwIfAborted()
   const controller = new AbortController()
   function abort(): void {
@@ -40,7 +45,10 @@ async function requestOnce(path: string, body: unknown, opts: ArkCallOptions, ti
   try {
     const response = await tauriFetch(`${ARK_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${opts.apiKey}`,
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
     })
@@ -93,7 +101,9 @@ async function arkPost(
       // 是排查关键，必须带出，上游 operationError 按它分类提示
       const err = (json as { error?: { code?: string; message?: string } } | null)?.error
       const code =
-        typeof err?.code === 'string' && /^[A-Za-z0-9_.-]{1,80}$/.test(err.code) ? err.code : null
+        typeof err?.code === 'string' && /^[A-Za-z0-9_.-]{1,80}$/.test(err.code)
+          ? err.code
+          : null
       throw new Error(
         `${label} HTTP ${res.status}${code ? `（${code}）` : ''}：请求未完成，请重试。`,
       )
@@ -105,8 +115,27 @@ async function arkPost(
 // —— 文案（Responses API：system 走 instructions，关思考链，json_object 走 text.format）——
 
 export interface ChatMessage {
-  role: 'system' | 'user'
+  role: 'system' | 'user' | 'assistant'
   content: string
+  imageDataUrl?: string
+}
+
+function responseMessage(message: ChatMessage): unknown {
+  if (message.role === 'assistant')
+    return {
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'output_text', text: message.content }],
+    }
+  return {
+    role: message.role,
+    content: [
+      { type: 'input_text', text: message.content },
+      ...(message.imageDataUrl && message.role === 'user'
+        ? [{ type: 'input_image', image_url: message.imageDataUrl }]
+        : []),
+    ],
+  }
 }
 
 function chatBody(model: string, messages: ChatMessage[], jsonMode: boolean): unknown {
@@ -118,7 +147,7 @@ function chatBody(model: string, messages: ChatMessage[], jsonMode: boolean): un
     stream: false,
     thinking: { type: 'disabled' },
     ...(system ? { instructions: system } : {}),
-    input: rest.map((m) => ({ role: m.role, content: [{ type: 'input_text', text: m.content }] })),
+    input: rest.map(responseMessage),
     ...(jsonMode ? { text: { format: { type: 'json_object' } } } : {}),
   }
 }
@@ -163,7 +192,7 @@ export const IMAGE_SIZE = '1024x1024'
 export async function arkGenerateImage(
   opts: ArkCallOptions & {
     prompt: string
-    refDataUrl: string
+    refDataUrl: string | string[]
   },
 ): Promise<Uint8Array> {
   const json = (await arkPost(
@@ -198,12 +227,46 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-export async function bytesToDataUrl(bytes: Uint8Array): Promise<string> {
+export async function bytesToDataUrl(
+  bytes: Uint8Array,
+  signal?: AbortSignal,
+): Promise<string> {
+  signal?.throwIfAborted()
   const blob = new Blob([bytes as BlobPart], { type: 'image/png' })
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error ?? new Error('读取图片失败'))
-    reader.readAsDataURL(blob)
+    readDataUrl({ blob, signal, resolve, reject })
   })
+}
+
+interface DataUrlReadOptions {
+  blob: Blob
+  signal?: AbortSignal
+  resolve: (value: string) => void
+  reject: (reason: unknown) => void
+}
+
+function readDataUrl({ blob, signal, resolve, reject }: DataUrlReadOptions): void {
+  const reader = new FileReader()
+  function cleanup(): void {
+    signal?.removeEventListener('abort', cancel)
+    reader.onload = null
+    reader.onerror = null
+  }
+  function cancel(): void {
+    cleanup()
+    reader.abort()
+    reject(new DOMException('操作已取消', 'AbortError'))
+  }
+  function finish(): void {
+    cleanup()
+    if (reader.error || typeof reader.result !== 'string') {
+      reject(reader.error ?? new Error('读取图片失败'))
+      return
+    }
+    resolve(reader.result)
+  }
+  reader.onload = finish
+  reader.onerror = finish
+  signal?.addEventListener('abort', cancel, { once: true })
+  reader.readAsDataURL(blob)
 }

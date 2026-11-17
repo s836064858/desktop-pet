@@ -31,7 +31,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: '回到本页粘贴密钥',
-    desc: '在上方「AI 素材密钥」卡片粘贴密钥并保存，保存后即可开始 AI 起草与生图。',
+    desc: '点击「我已拿到密钥」，在右上角密钥设置中粘贴并保存，即可开始对话规划与生图。',
   },
 ]
 
@@ -48,22 +48,35 @@ async function openLink(url: string): Promise<void> {
 <template>
   <section class="forge-guide" aria-label="火山方舟开通引导">
     <h3 class="guide-title">接入火山方舟，开启 AI 生成</h3>
-    <p class="guide-intro">首次使用需要一把火山方舟 API Key，按下面四步获取，全程约五分钟。</p>
+    <p class="guide-intro">
+      首次使用需要一把火山方舟 API Key，按下面四步获取，全程约五分钟。
+    </p>
     <ol class="guide-steps">
       <li v-for="(item, index) in guideSteps" :key="item.title" class="guide-step">
         <span class="guide-number" aria-hidden="true">{{ index + 1 }}</span>
         <div class="step-body">
           <h4 class="step-title">{{ item.title }}</h4>
           <p class="step-desc">{{ item.desc }}</p>
-          <el-button v-if="item.url" class="step-link" text size="small" @click="openLink(item.url)">
+          <el-button
+            v-if="item.url"
+            class="step-link"
+            text
+            size="small"
+            @click="openLink(item.url)"
+          >
             <AppIcon name="external" :size="14" />{{ item.linkLabel }}
           </el-button>
         </div>
       </li>
     </ol>
     <div class="guide-foot">
-      <p class="guide-note"><AppIcon name="info" :size="14" /> 密钥只保存在本机设置中，仅用于调用你自己的方舟账户。</p>
-      <el-button size="small" aria-label="完成引导，返回生成" @click="emit('done')">我已拿到密钥</el-button>
+      <p class="guide-note">
+        <AppIcon name="info" :size="14" />
+        密钥只保存在本机设置中，仅用于调用你自己的方舟账户。
+      </p>
+      <el-button size="small" aria-label="完成引导，填写密钥" @click="emit('done')"
+        >我已拿到密钥</el-button
+      >
     </div>
   </section>
 </template>

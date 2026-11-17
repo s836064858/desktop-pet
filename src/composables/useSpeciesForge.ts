@@ -1,309 +1,312 @@
-import { computed, onUnmounted, reactive, shallowReactive, shallowRef } from 'vue'
+import { computed, onUnmounted, reactive, shallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { readSettings } from '../lib/capabilities'
-import {
-  FRAME_KEYS,
-  buildDerivedPrompt,
-  buildIdlePrompt,
-  draftSpecies,
-  generateFramePng,
-} from '../lib/spriteStudio'
-import { processSpritePng } from '../lib/spritePipeline'
-import type { SpeciesDraft } from '../lib/spriteStudio'
+import { validateGrowthDescriptions } from '../lib/plantPlan'
+import type { PlantPlan } from '../lib/plantPlan'
 import type { CustomSpeciesMeta } from '../lib/spriteLibrary'
 import { getCustomSpecies, saveSpeciesToLibrary } from '../lib/spriteLibrary'
-import { builtinSpeciesCodes } from '../lib/speciesRegistry'
-import type { FrameName } from '../lib/speciesArt'
-import type { ForgeForm, ForgeStep, FrameStatus } from '../components/care/forge/types'
+import { FRAME_KEYS, GROWTH_STAGE_KEYS, GROWTH_STAGE_LABELS } from '../lib/spriteFrames'
+import type { FrameName, FrameTarget, GrowthFrames } from '../lib/spriteFrames'
+import type { GrowthStage } from '../lib/growth'
+import type { ForgeForm, ForgeStep } from '../components/care/forge/types'
 import { FRAME_META } from '../components/care/forge/types'
+import { useForgeFrames } from './useForgeFrames'
 import styleRefUrl from '../assets/sprite-ref/style-ref.png'
 import { createCareProfile, validateCareProfile } from '../lib/careProfile'
+import type { SpriteAnchor } from '../lib/spriteAlignment'
+import { usePlantReference } from './usePlantReference'
+import { usePlantPlanning } from './usePlantPlanning'
+
+type Operation = 'draft' | 'bases' | 'derive' | 'retry' | 'save' | 'reference'
 
 function createForm(): ForgeForm {
   return {
-    code: '',
+    code: 'plant-' + crypto.randomUUID(),
     name: '',
     emoji: '🌱',
     desc: '',
-    states: Object.fromEntries(FRAME_KEYS.map((frame) => [frame, ''])) as Record<FrameName, string>,
+    states: Object.fromEntries(FRAME_KEYS.map((frame) => [frame, ''])) as Record<
+      FrameName,
+      string
+    >,
+    stages: { juvenile: '', adult: '', full: '' },
     careProfile: createCareProfile(),
   }
 }
 
-// 错误码对照：https://console.volcengine.com/ark/region:cn-beijing/docs/error-codes
-// 分类只认方舟 code 与 HTTP 状态，指引之外保留模型原始 message（截断），完整错误打 console
 function operationError(error: unknown): string {
   const raw = (error instanceof Error ? error.message : String(error)).trim()
-  if (!raw) return '操作未完成，请稍后重试，已完成的图片会保留。'
-  const guide = errorGuide(raw)
-  if (!guide) return truncate(raw, 300) // 本地校验类错误（如「AI 文案多次都不合规」）原文即有用
-  return `${guide}\n详情：${truncate(raw, 300)}`
-}
-
-function errorGuide(message: string): string {
+  const detail = raw.length > 300 ? raw.slice(0, 300) + '…' : raw
   if (
     /401|403|鉴权|AuthenticationFailed|InvalidAccessToken|ExpiredAccessToken|AccessDenied/.test(
-      message,
+      raw,
     )
   )
     return '密钥验证失败，请在上方检查 AI 素材密钥。'
-  if (/DataInspectionFailed|SensitiveContentDetected|内容审核|敏感/.test(message))
-    return '内容未通过平台安全审核，请调整植物外形或状态描述后重试。'
-  if (/ModelNotOpen|InvalidEndpointOrModel|OpenServiceRejected|未开通/.test(message))
-    return '方舟模型尚未开通，请按上方教程在控制台「开通管理」中开通所需模型。'
-  if (/429|FlowLimit|ReqThrottle|Quota/.test(message)) return '请求较多或配额不足，请稍后再试。'
-  if (/InvalidParameter|参数/.test(message))
-    return '请求参数未通过，通常与提示词有关，请调整描述后重试。'
-  if (/HTTP 5\d\d|InternalServiceError|ServiceUnavailable/.test(message))
-    return '生成服务暂时不可用，请稍后重试，已完成的图片会保留。'
-  if (/timeout|超时|abort/i.test(message)) return '请求超时，请稍后重试，已完成的图片会保留。'
-  if (/网络|fetch|network/i.test(message)) return '网络连接失败，请检查网络后重试。'
-  return ''
+  if (/ModelNotOpen|InvalidEndpointOrModel|OpenServiceRejected|未开通/.test(raw))
+    return '方舟模型尚未开通，请按教程在控制台「开通管理」中开通所需模型。'
+  if (/429|FlowLimit|ReqThrottle|Quota/.test(raw))
+    return '请求较多或配额不足，请稍后再试。'
+  if (/DataInspectionFailed|SensitiveContentDetected|内容审核|敏感/.test(raw))
+    return '内容未通过平台审核，请调整植物外形或状态描述后重试。'
+  return detail || '操作未完成，请稍后重试，已完成的图片会保留。'
 }
 
-function truncate(text: string, max: number): string {
-  return text.length > max ? text.slice(0, max) + '…' : text
+function shouldStopBatch(error: unknown): boolean {
+  return /401|403|429|鉴权|ModelNotOpen|InvalidEndpointOrModel|OpenServiceRejected|FlowLimit|Quota|网络|HTTP 5\d\d/.test(
+    String(error),
+  )
 }
 
 export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
   const form = reactive<ForgeForm>(createForm())
   const step = shallowRef<ForgeStep>('compose')
-  const phrase = shallowRef('')
-  const hasDraft = shallowRef(false)
-  const isDrafting = shallowRef(false)
-  const isGenerating = shallowRef(false)
-  const isSaving = shallowRef(false)
-  const regeneratingFrame = shallowRef<FrameName | null>(null)
+  const operation = shallowRef<Operation | null>(null)
+  const isCancelling = shallowRef(false)
+  const regeneratingTarget = shallowRef<FrameTarget | null>(null)
   const errorMessage = shallowRef('')
-  const frameStatus = reactive(
-    Object.fromEntries(FRAME_KEYS.map((frame) => [frame, 'pending'])) as Record<
-      FrameName,
-      FrameStatus
-    >,
+  const frames = useForgeFrames(form)
+  const plantReference = usePlantReference()
+  const planning = usePlantPlanning({ onPlan: applyPlan })
+  const phrase = planning.message
+  const hasDraft = planning.hasReadyPlan
+  const canGenerate = computed(() => hasDraft.value && !phrase.value.trim())
+  const referenceMessage = shallowRef('')
+  const isBusy = computed(() => operation.value !== null)
+  const isDrafting = computed(() => operation.value === 'draft')
+  const isGenerating = computed(
+    () => operation.value === 'bases' || operation.value === 'derive',
   )
-  const frameUrls = reactive<Partial<Record<FrameName, string>>>({})
-  const frameBytes = shallowReactive<Partial<Record<FrameName, Uint8Array>>>({})
-  const isBusy = computed(
-    () =>
-      isDrafting.value || isGenerating.value || isSaving.value || regeneratingFrame.value !== null,
-  )
-  const doneCount = computed(
-    () => FRAME_KEYS.filter((frame) => frameStatus[frame] === 'done').length,
-  )
-  const allDone = computed(() => doneCount.value === FRAME_KEYS.length)
-  const hasError = computed(() => FRAME_KEYS.some((frame) => frameStatus[frame] === 'error'))
+  const isSaving = computed(() => operation.value === 'save')
+  const isReadingReference = computed(() => operation.value === 'reference')
   let isActive = true
+  let controller: AbortController | null = null
   let styleRefBytes: Uint8Array | null = null
-  const localController = new AbortController()
-
-  function clearFrames(): void {
-    for (const frame of FRAME_KEYS) {
-      if (frameUrls[frame]) URL.revokeObjectURL(frameUrls[frame]!)
-      delete frameUrls[frame]
-      delete frameBytes[frame]
-      frameStatus[frame] = 'pending'
-    }
-  }
 
   onUnmounted(() => {
     isActive = false
-    localController.abort()
-    clearFrames()
+    controller?.abort()
     styleRefBytes = null
   })
 
-  async function ensureApiKey(): Promise<string> {
+  async function runOperation(
+    kind: Operation,
+    action: (signal: AbortSignal) => Promise<void>,
+  ): Promise<void> {
+    if (!isActive || isBusy.value) return
+    const current = new AbortController()
+    controller = current
+    operation.value = kind
+    errorMessage.value = ''
+    try {
+      await action(current.signal)
+    } catch (error) {
+      if (isActive)
+        errorMessage.value = current.signal.aborted
+          ? kind === 'reference'
+            ? '已停止读取，原参考图和已完成的图片会保留。'
+            : kind === 'draft'
+              ? '对话已停止，内容已保留，可重试本轮或继续发送。'
+              : '已停止。已完成的图片保留在本次窗口中，可继续补齐；关闭窗口后将丢弃。'
+          : operationError(error)
+    } finally {
+      finishOperation()
+    }
+  }
+
+  function finishOperation(): void {
+    controller = null
+    if (!isActive) return
+    operation.value = null
+    regeneratingTarget.value = null
+    isCancelling.value = false
+  }
+
+  async function ensureApiKey(signal: AbortSignal): Promise<string> {
     const settings = await readSettings()
+    signal.throwIfAborted()
     const key = settings.arkApiKey.trim()
     if (!key) throw new Error('鉴权：缺少密钥')
     return key
   }
 
-  function validateForm(): string {
-    if (!/^[a-z][a-z0-9-]*$/.test(form.code)) return '物种标识需使用英文小写、数字和中划线。'
-    if (builtinSpeciesCodes().has(form.code)) return '物种标识已被内置植物使用，请换一个。'
-    if (!form.name.trim() || !form.desc.trim()) return '请填写植物名称和外形描述。'
-    if (FRAME_KEYS.some((frame) => !form.states[frame].trim())) return '请补齐六种状态描述。'
-    try {
-      validateCareProfile(form.careProfile)
-      return ''
-    } catch (cause) {
-      return cause instanceof Error ? cause.message : '请补齐养护习性。'
-    }
+  function validateForm(): void {
+    if (!canGenerate.value)
+      throw new Error('请先在对话中明确植物档案，未发送的修改需先发送或清空。')
+    if (!/^[a-z][a-z0-9-]{0,63}$/.test(form.code))
+      throw new Error('物种标识需为 64 字以内的英文小写、数字和中划线。')
+    if (
+      !form.name.trim() ||
+      form.name.length > 12 ||
+      !form.desc.trim() ||
+      form.desc.length > 120
+    )
+      throw new Error('请填写植物名称（1–12 字）和外形描述（1–120 字）。')
+    if (
+      FRAME_KEYS.some(
+        (frame) => !form.states[frame].trim() || form.states[frame].length > 100,
+      )
+    )
+      throw new Error('请补齐六种状态描述，每条 1–100 字。')
+    validateGrowthDescriptions(form.stages)
+    validateCareProfile(form.careProfile)
   }
 
-  async function isCodeAvailable(): Promise<boolean> {
+  async function validateAvailability(signal: AbortSignal): Promise<void> {
+    validateForm()
     const existing = await getCustomSpecies(form.code)
-    if (!isActive) return false
-    if (existing) {
-      errorMessage.value = '本机已有相同物种标识，请返回设定修改。'
-      return false
-    }
-    return true
+    signal.throwIfAborted()
+    if (existing) throw new Error('本地植物档案编号冲突，请重新打开创建窗口再试。')
+  }
+
+  function applyPlan(plan: PlantPlan): void {
+    const next: ForgeForm = { ...plan, code: form.code }
+    frames.invalidateForm(next)
+    Object.assign(form, next)
   }
 
   async function startDraft(): Promise<void> {
-    if (isBusy.value) return
-    if (!phrase.value.trim()) {
-      errorMessage.value = '先输入想生成的植物名。'
-      return
-    }
-    isDrafting.value = true
-    errorMessage.value = ''
-    try {
-      const key = await ensureApiKey()
-      if (!isActive) return
-      const draft = await draftSpecies(key, phrase.value.trim(), localController.signal)
-      if (!isActive) return
-      applyDraft(draft)
-    } catch (error) {
-      if (isActive) errorMessage.value = operationError(error)
-    } finally {
-      if (isActive) isDrafting.value = false
-    }
+    await sendPlanning({})
   }
 
-  function applyDraft(draft: SpeciesDraft): void {
-    if (builtinSpeciesCodes().has(draft.code)) {
-      errorMessage.value = '该物种已内置，请换个植物重新起草。'
-      return
-    }
-    clearFrames()
-    Object.assign(form, {
-      code: draft.code,
-      name: draft.name,
-      emoji: draft.emoji,
-      desc: draft.desc,
-      states: { ...draft.states },
-      careProfile: { ...draft.careProfile },
-    })
-    hasDraft.value = true
+  async function retryDraft(): Promise<void> {
+    await sendPlanning({ isRetry: true })
   }
 
-  async function getReference(frame: FrameName): Promise<Uint8Array> {
-    if (frame !== 'idle') {
-      const idle = frameBytes.idle
-      if (!idle) throw new Error('缺少基础形象')
-      return idle
-    }
-    if (!styleRefBytes) {
-      const response = await fetch(styleRefUrl, { signal: localController.signal })
-      if (!response.ok) throw new Error('参考图加载失败')
-      styleRefBytes = new Uint8Array(await response.arrayBuffer())
-    }
-    return styleRefBytes
-  }
-
-  async function generateOne(frame: FrameName, apiKey: string): Promise<void> {
-    if (!isActive) return
-    frameStatus[frame] = 'running'
-    try {
-      const refPngBytes = await getReference(frame)
-      if (!isActive) return
-      const prompt =
-        frame === 'idle'
-          ? buildIdlePrompt(form.desc.trim())
-          : buildDerivedPrompt(form.desc.trim(), frame, form.states[frame].trim())
-      const bytes = await generateFramePng({
-        apiKey,
-        prompt,
-        refPngBytes,
-        signal: localController.signal,
+  async function sendPlanning(options: { isRetry?: boolean }): Promise<void> {
+    await runOperation('draft', async (signal) => {
+      const key = await ensureApiKey(signal)
+      referenceMessage.value = ''
+      await planning.discuss({
+        apiKey: key,
+        signal,
+        imageBytes: plantReference.getBytes() ?? undefined,
+        imagePreviewUrl: plantReference.previewUrl.value,
+        isRetry: options.isRetry,
       })
-      if (!isActive) return
-      const preview = await processSpritePng(bytes)
-      if (!isActive) return
-      if (frameUrls[frame]) URL.revokeObjectURL(frameUrls[frame]!)
-      frameBytes[frame] = bytes
-      frameUrls[frame] = URL.createObjectURL(new Blob([preview as BlobPart], { type: 'image/png' }))
-      frameStatus[frame] = 'done'
-    } catch (error) {
-      if (isActive) frameStatus[frame] = 'error'
-      throw error
-    }
+    })
   }
 
-  async function generateDerived(apiKey: string): Promise<void> {
-    for (const frame of FRAME_KEYS) {
-      if (!isActive) return
-      if (frame === 'idle') continue
+  async function getStyleReference(signal: AbortSignal): Promise<Uint8Array> {
+    if (styleRefBytes) return styleRefBytes
+    const response = await fetch(styleRefUrl, { signal })
+    if (!response.ok) throw new Error('参考图加载失败，请重试。')
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    signal.throwIfAborted()
+    styleRefBytes = bytes
+    return bytes
+  }
+
+  async function generateTargets(
+    targets: FrameTarget[],
+    signal: AbortSignal,
+  ): Promise<void> {
+    const key = await ensureApiKey(signal)
+    const failures: string[] = []
+    for (const target of targets) {
+      signal.throwIfAborted()
       try {
-        await generateOne(frame, apiKey)
+        await generateTarget({ target, apiKey: key, signal })
       } catch (error) {
-        if (isActive)
-          errorMessage.value = FRAME_META[frame].label + '生成失败。' + operationError(error)
+        signal.throwIfAborted()
+        if (shouldStopBatch(error)) throw error
+        failures.push(
+          `${GROWTH_STAGE_LABELS[target.stage]}·${FRAME_META[target.frame].label}：${operationError(error)}`,
+        )
       }
     }
+    if (failures.length) throw new Error(failures.join('\n'))
+  }
+
+  async function generateTarget(options: {
+    target: FrameTarget
+    apiKey: string
+    signal: AbortSignal
+  }): Promise<void> {
+    const { target, apiKey, signal } = options
+    const reference =
+      target.frame === 'idle'
+        ? await getStyleReference(signal)
+        : frames.getBaseBytes(target.stage)
+    const plantRefPngBytes =
+      target.frame === 'idle' ? (plantReference.getBytes() ?? undefined) : undefined
+    await frames.generateOne({ ...target, apiKey, reference, plantRefPngBytes, signal })
   }
 
   async function startGenerate(): Promise<void> {
-    if (isBusy.value) return
-    errorMessage.value = validateForm()
-    if (errorMessage.value) return
-    isGenerating.value = true
-    try {
-      if (!(await isCodeAvailable())) return
-      const key = await ensureApiKey()
-      if (!isActive) return
-      clearFrames()
+    await runOperation('bases', async (signal) => {
+      await validateAvailability(signal)
+      step.value = 'bases'
+      const targets = GROWTH_STAGE_KEYS.filter(
+        (stage) => frames.frameStatus[stage].idle !== 'done',
+      ).map((stage) => ({ stage, frame: 'idle' as const }))
+      if (targets.length) await generateTargets(targets, signal)
+    })
+  }
+
+  async function uploadReference(file: File): Promise<void> {
+    await runOperation('reference', async (signal) => {
+      referenceMessage.value = ''
+      const hasGeneratedFrames = frames.doneCount.value > 0
+      await plantReference.replace({ file, signal })
+      signal.throwIfAborted()
+      frames.clearAll()
+      planning.photoChanged(true)
+      referenceMessage.value = hasGeneratedFrames
+        ? '照片已更新，请重新发送以确认档案；旧形象与状态已清除。'
+        : '照片已就绪，直接发送即可识别和规划，不必先填写植物名称。'
+    })
+  }
+
+  function removeReference(): void {
+    if (isBusy.value || !plantReference.getBytes()) return
+    const hasGeneratedFrames = frames.doneCount.value > 0
+    plantReference.clear()
+    frames.clearAll()
+    planning.photoChanged(false)
+    referenceMessage.value = hasGeneratedFrames
+      ? '已移除植物参考图；将使用芽伴默认参考，原有生成结果已清除。'
+      : '已移除植物参考图，将使用芽伴默认参考。'
+  }
+
+  function confirmBase(stage: GrowthStage): void {
+    if (!isBusy.value) frames.confirmBase(stage)
+  }
+
+  async function startDerived(): Promise<void> {
+    if (!frames.hasConfirmedBases.value) return
+    await runOperation('derive', async (signal) => {
+      await validateAvailability(signal)
       step.value = 'generate'
-      await generateOne('idle', key)
-      if (isActive) await generateDerived(key)
-    } catch (error) {
-      if (isActive) errorMessage.value = operationError(error)
-    } finally {
-      if (isActive) isGenerating.value = false
-    }
+      const targets = GROWTH_STAGE_KEYS.flatMap((stage) =>
+        FRAME_KEYS.filter(
+          (frame) => frame !== 'idle' && frames.frameStatus[stage][frame] !== 'done',
+        ).map((frame) => ({ stage, frame })),
+      )
+      if (targets.length) await generateTargets(targets, signal)
+      signal.throwIfAborted()
+      step.value = 'gallery'
+    })
   }
 
-  async function regenerate(frame: FrameName): Promise<void> {
-    if (isBusy.value) return
-    if (frame !== 'idle' && !frameBytes.idle) {
-      errorMessage.value = '请先重试基础形象，再生成其他状态。'
-      return
-    }
-    regeneratingFrame.value = frame
-    errorMessage.value = ''
-    try {
-      const key = await ensureApiKey()
-      if (isActive) await generateOne(frame, key)
-    } catch (error) {
-      if (isActive)
-        errorMessage.value = FRAME_META[frame].label + '生成失败。' + operationError(error)
-    } finally {
-      if (isActive) regeneratingFrame.value = null
-    }
-  }
-
-  async function collectFrames(): Promise<Partial<Record<FrameName, Uint8Array>>> {
-    const frames: Partial<Record<FrameName, Uint8Array>> = {}
-    for (const frame of FRAME_KEYS) {
-      if (!isActive) throw new Error('操作已失效')
-      const bytes = frameBytes[frame]
-      if (!bytes) throw new Error('缺少状态图片')
-      frames[frame] = await processSpritePng(bytes)
-    }
-    return frames
+  async function regenerate(target: FrameTarget): Promise<void> {
+    if (target.frame !== 'idle' && !frames.hasConfirmedBases.value) return
+    await runOperation('retry', async (signal) => {
+      regeneratingTarget.value = target
+      if (target.frame === 'idle') step.value = 'bases'
+      await generateTargets([target], signal)
+    })
   }
 
   async function saveToLibrary(): Promise<void> {
-    if (isBusy.value || !allDone.value) return
-    errorMessage.value = validateForm()
-    if (errorMessage.value) return
-    isSaving.value = true
-    try {
-      if (!(await isCodeAvailable())) return
-      const frames = await collectFrames()
+    if (!frames.isAllDone.value) return
+    await runOperation('save', async (signal) => {
+      await validateAvailability(signal)
+      await saveSpeciesToLibrary(buildMetadata(), frames.processedBytes, signal)
       if (!isActive) return
-      await saveSpeciesToLibrary(buildMetadata(), frames)
-      if (!isActive) return
-      ElMessage.success(form.name.trim() + '已加入物种库，去领养页迎接它吧。')
+      ElMessage.success(form.name.trim() + '已加入植物库，去领养页迎接它吧。')
       options.onSaved(form.code)
-    } catch (error) {
-      if (isActive) errorMessage.value = '入库失败。' + operationError(error)
-    } finally {
-      if (isActive) isSaving.value = false
-    }
+    })
   }
 
   function buildMetadata(): Omit<CustomSpeciesMeta, 'createdAt'> {
@@ -313,13 +316,30 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
       emoji: form.emoji.trim() || '🌱',
       desc: form.desc.trim(),
       states: { ...form.states },
+      stages: { ...form.stages },
+      artVersion: 2,
       careProfile: validateCareProfile(form.careProfile),
+      alignment: { version: 1, method: 'automatic', anchors: buildAlignmentAnchors() },
     }
   }
 
-  function returnToCompose(): void {
+  function buildAlignmentAnchors(): GrowthFrames<SpriteAnchor> {
+    return {
+      juvenile: { ...frames.anchors.juvenile },
+      adult: { ...frames.anchors.adult },
+      full: { ...frames.anchors.full },
+    }
+  }
+
+  function cancelOperation(): void {
+    if (!controller || isSaving.value) return
+    isCancelling.value = true
+    controller.abort()
+  }
+
+  function goToStep(next: ForgeStep): void {
     if (isBusy.value) return
-    step.value = 'compose'
+    step.value = next
     errorMessage.value = ''
   }
 
@@ -328,21 +348,41 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
     step,
     phrase,
     hasDraft,
+    canGenerate,
+    chatMessages: planning.messages,
+    planMessageId: planning.planMessageId,
+    canSendPlanning: planning.canSend,
+    canRetryPlanning: planning.canRetry,
     isDrafting,
     isGenerating,
     isSaving,
-    regeneratingFrame,
-    errorMessage,
-    frameStatus,
-    frameUrls,
+    isReadingReference,
+    referencePreviewUrl: plantReference.previewUrl,
+    referenceFileName: plantReference.fileName,
+    referenceDimensions: plantReference.dimensions,
+    referenceMessage,
     isBusy,
-    doneCount,
-    allDone,
-    hasError,
+    isCancelling,
+    regeneratingTarget,
+    errorMessage,
+    frameStatus: frames.frameStatus,
+    frameUrls: frames.frameUrls,
+    frameErrors: frames.frameErrors,
+    confirmedBases: frames.confirmedBases,
+    hasConfirmedBases: frames.hasConfirmedBases,
+    doneCount: frames.doneCount,
+    checkedCount: frames.checkedCount,
+    isAllDone: frames.isAllDone,
     startDraft,
+    retryDraft,
     startGenerate,
+    confirmBase,
+    startDerived,
     regenerate,
     saveToLibrary,
-    returnToCompose,
+    cancelOperation,
+    goToStep,
+    uploadReference,
+    removeReference,
   }
 }
