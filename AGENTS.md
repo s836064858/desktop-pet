@@ -54,7 +54,7 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（.env 配 ARK_API_KE
 - 阶段：每天首次摸摸（抚摸或点击）、浇水或光照互动自动记 1 日；幼年体 → 成年体（14 日）→ 完全体（累计 42 日）。互动成长不额外计分、漏做不扣进度；积分仍走 `completeTask`，由 SQLite 触发器原子提交任务状态、流水、连续养护与当日成长。面板不提供独立打卡或任务操作按钮，计划仅展示时间与状态；无任务日摸摸即可成长。
 - 成长与习性：`plant_growth` 按 plant_id 初始化一次，`daily_inspection` 用 `(plant_id, day_key)` 去重；存量植物迁移为幼年，保留积分与已完成养护历史，不能调用 `resetPlant` 代替迁移。习性只包含浇水/光照各每几天一次及一段只读富文本；旧版未完成计划通过 `simplified_care_schedule` 一次性重建，不再填写观察表。AI 仅创建物种时同时生成习性；富文本只允许安全排版标签、剥离所有属性。
 - dev 成长预览：仅 `import.meta.env.DEV` 加载调试面板与 `devGrowth`，覆盖天数写入独立 `sproutkin-dev.db`；真实成长、积分与任务不变，支持恢复真实进度。正式构建必须移除调试入口与模块。
-- 阶段素材：绿萝已配三阶段 × 六状态；`node scripts/process-sprites.mjs pothos --growth-only` 按 `scripts/growth-sprites.json` 生成 400px 帧并对齐花盆与脚底。其他物种使用原有 stage0，不以缩放伪造阶段形态。
+- 阶段素材：绿萝、龟背竹、多肉（桃太郎）、仙人球、狗尾巴草均已配三阶段 × 六状态；`node scripts/process-sprites.mjs <species> --growth-only` 按多物种 `scripts/growth-sprites.json` 生成 400px 帧，统一 180px 花盆宽度与 y=380 脚底。龟背竹成年/完全体采用紧凑 v2；原图与废稿选择看 `SPRITE-HANDOFF.md`。候选可加 `--preview` 输出到忽略的 `test/growth-preview/`，正式输出要求每物种 18 帧齐全并检查裁切；不以整体缩放伪造阶段形态。
 
 ## 已知坑（改相关代码前先看）
 

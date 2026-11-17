@@ -1,186 +1,931 @@
 {
-  "species": "pothos",
+  "schemaVersion": 2,
   "targetPotWidth": 180,
-  "frames": [
+  "species": [
     {
-      "stage": "juvenile",
-      "name": "idle1",
-      "file": "绿萝/growth-study-v1/juvenile/idle1.png",
-      "anchor": {
-        "centerX": 597,
-        "footY": 1108,
-        "potWidth": 555
-      }
+      "code": "pothos",
+      "frames": [
+        {
+          "stage": "juvenile",
+          "name": "idle1",
+          "file": "绿萝/growth-study-v1/juvenile/idle1.png",
+          "anchor": {
+            "centerX": 597,
+            "footY": 1108,
+            "potWidth": 555
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "happy1",
+          "file": "绿萝/growth-study-v1/juvenile/happy1.png",
+          "anchor": {
+            "centerX": 597,
+            "footY": 1109,
+            "potWidth": 557
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "thirsty1",
+          "file": "绿萝/growth-study-v1/juvenile/thirsty1.png",
+          "anchor": {
+            "centerX": 595.5,
+            "footY": 1109,
+            "potWidth": 554
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "water1",
+          "file": "绿萝/growth-study-v1/juvenile/water1.png",
+          "anchor": {
+            "centerX": 597,
+            "footY": 1109,
+            "potWidth": 555
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sun1",
+          "file": "绿萝/growth-study-v1/juvenile/sun1.png",
+          "anchor": {
+            "centerX": 597.5,
+            "footY": 1108,
+            "potWidth": 558
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sleep1",
+          "file": "绿萝/growth-study-v1/juvenile/sleep1.png",
+          "anchor": {
+            "centerX": 597,
+            "footY": 1108,
+            "potWidth": 557
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "idle1",
+          "file": "绿萝/growth-study-v1/adult/idle1.png",
+          "anchor": {
+            "centerX": 623.5,
+            "footY": 1169,
+            "potWidth": 600
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "happy1",
+          "file": "绿萝/growth-study-v1/adult/happy1.png",
+          "anchor": {
+            "centerX": 625,
+            "footY": 1170,
+            "potWidth": 601
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "thirsty1",
+          "file": "绿萝/growth-study-v1/adult/thirsty1.png",
+          "anchor": {
+            "centerX": 624,
+            "footY": 1169,
+            "potWidth": 601
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "water1",
+          "file": "绿萝/growth-study-v1/adult/water1.png",
+          "anchor": {
+            "centerX": 625,
+            "footY": 1169,
+            "potWidth": 599
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sun1",
+          "file": "绿萝/growth-study-v1/adult/sun1.png",
+          "anchor": {
+            "centerX": 623.5,
+            "footY": 1169,
+            "potWidth": 600
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sleep1",
+          "file": "绿萝/growth-study-v1/adult/sleep1.png",
+          "anchor": {
+            "centerX": 624,
+            "footY": 1169,
+            "potWidth": 599
+          }
+        },
+        {
+          "stage": "full",
+          "name": "idle1",
+          "file": "绿萝/growth-study-v1/full/idle1.png",
+          "anchor": {
+            "centerX": 624,
+            "footY": 1171,
+            "potWidth": 587
+          }
+        },
+        {
+          "stage": "full",
+          "name": "happy1",
+          "file": "绿萝/growth-study-v1/full/happy1.png",
+          "anchor": {
+            "centerX": 624,
+            "footY": 1172,
+            "potWidth": 587
+          }
+        },
+        {
+          "stage": "full",
+          "name": "thirsty1",
+          "file": "绿萝/growth-study-v1/full/thirsty1.png",
+          "anchor": {
+            "centerX": 623,
+            "footY": 1171,
+            "potWidth": 587
+          }
+        },
+        {
+          "stage": "full",
+          "name": "water1",
+          "file": "绿萝/growth-study-v1/full/water1.png",
+          "anchor": {
+            "centerX": 624,
+            "footY": 1172,
+            "potWidth": 589
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sun1",
+          "file": "绿萝/growth-study-v1/full/sun1.png",
+          "anchor": {
+            "centerX": 624,
+            "footY": 1171,
+            "potWidth": 587
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sleep1",
+          "file": "绿萝/growth-study-v1/full/sleep1.png",
+          "anchor": {
+            "centerX": 624,
+            "footY": 1171,
+            "potWidth": 587
+          }
+        }
+      ]
     },
     {
-      "stage": "juvenile",
-      "name": "happy1",
-      "file": "绿萝/growth-study-v1/juvenile/happy1.png",
-      "anchor": {
-        "centerX": 597,
-        "footY": 1109,
-        "potWidth": 557
-      }
+      "code": "monstera",
+      "frames": [
+        {
+          "stage": "juvenile",
+          "name": "idle1",
+          "file": "龟背竹/growth-study-v1/juvenile/idle1.png",
+          "anchor": {
+            "centerX": 618.0,
+            "footY": 1149,
+            "potWidth": 519
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "happy1",
+          "file": "龟背竹/growth-study-v1/juvenile/happy1.png",
+          "anchor": {
+            "centerX": 619.5,
+            "footY": 1119,
+            "potWidth": 524
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "thirsty1",
+          "file": "龟背竹/growth-study-v1/juvenile/thirsty1.png",
+          "anchor": {
+            "centerX": 618.5,
+            "footY": 1150,
+            "potWidth": 522
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "water1",
+          "file": "龟背竹/growth-study-v1/juvenile/water1.png",
+          "anchor": {
+            "centerX": 618.5,
+            "footY": 1150,
+            "potWidth": 522
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sun1",
+          "file": "龟背竹/growth-study-v1/juvenile/sun1.png",
+          "anchor": {
+            "centerX": 618.5,
+            "footY": 1150,
+            "potWidth": 522
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sleep1",
+          "file": "龟背竹/growth-study-v1/juvenile/sleep1.png",
+          "anchor": {
+            "centerX": 618.5,
+            "footY": 1150,
+            "potWidth": 522
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "idle1",
+          "file": "龟背竹/growth-compact-v2/adult/idle1.png",
+          "anchor": {
+            "centerX": 614.5,
+            "footY": 1188,
+            "potWidth": 502
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "happy1",
+          "file": "龟背竹/growth-compact-v2/adult/happy1.png",
+          "anchor": {
+            "centerX": 615.0,
+            "footY": 1190,
+            "potWidth": 505
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "thirsty1",
+          "file": "龟背竹/growth-compact-v2/adult/thirsty1.png",
+          "anchor": {
+            "centerX": 614.5,
+            "footY": 1189,
+            "potWidth": 504
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "water1",
+          "file": "龟背竹/growth-compact-v2/adult/water1.png",
+          "anchor": {
+            "centerX": 614.5,
+            "footY": 1189,
+            "potWidth": 504
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sun1",
+          "file": "龟背竹/growth-compact-v2/adult/sun1.png",
+          "anchor": {
+            "centerX": 614.5,
+            "footY": 1190,
+            "potWidth": 504
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sleep1",
+          "file": "龟背竹/growth-compact-v2/adult/sleep1.png",
+          "anchor": {
+            "centerX": 615.0,
+            "footY": 1189,
+            "potWidth": 505
+          }
+        },
+        {
+          "stage": "full",
+          "name": "idle1",
+          "file": "龟背竹/growth-compact-v2/full/idle1.png",
+          "anchor": {
+            "centerX": 614.0,
+            "footY": 1158,
+            "potWidth": 441
+          }
+        },
+        {
+          "stage": "full",
+          "name": "happy1",
+          "file": "龟背竹/growth-compact-v2/full/happy1.png",
+          "anchor": {
+            "centerX": 614.0,
+            "footY": 1158,
+            "potWidth": 443
+          }
+        },
+        {
+          "stage": "full",
+          "name": "thirsty1",
+          "file": "龟背竹/growth-compact-v2/full/thirsty1.png",
+          "anchor": {
+            "centerX": 613.5,
+            "footY": 1158,
+            "potWidth": 442
+          }
+        },
+        {
+          "stage": "full",
+          "name": "water1",
+          "file": "龟背竹/growth-compact-v2/full/water1.png",
+          "anchor": {
+            "centerX": 613.5,
+            "footY": 1158,
+            "potWidth": 442
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sun1",
+          "file": "龟背竹/growth-compact-v2/full/sun-clean1.png",
+          "anchor": {
+            "centerX": 614.0,
+            "footY": 1157,
+            "potWidth": 441
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sleep1",
+          "file": "龟背竹/growth-compact-v2/full/sleep1.png",
+          "anchor": {
+            "centerX": 614.0,
+            "footY": 1158,
+            "potWidth": 443
+          }
+        }
+      ]
     },
     {
-      "stage": "juvenile",
-      "name": "thirsty1",
-      "file": "绿萝/growth-study-v1/juvenile/thirsty1.png",
-      "anchor": {
-        "centerX": 595.5,
-        "footY": 1109,
-        "potWidth": 554
-      }
+      "code": "succulent",
+      "frames": [
+        {
+          "stage": "juvenile",
+          "name": "idle1",
+          "file": "多肉/growth-study-v1/juvenile/idle1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1187,
+            "potWidth": 866
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "happy1",
+          "file": "多肉/growth-study-v1/juvenile/happy1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1187,
+            "potWidth": 864
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "thirsty1",
+          "file": "多肉/growth-study-v1/juvenile/thirsty1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1188,
+            "potWidth": 868
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "water1",
+          "file": "多肉/growth-study-v1/juvenile/water1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1188,
+            "potWidth": 864
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sun1",
+          "file": "多肉/growth-study-v1/juvenile/sun1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1187,
+            "potWidth": 866
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sleep1",
+          "file": "多肉/growth-study-v1/juvenile/sleep1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1188,
+            "potWidth": 868
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "idle1",
+          "file": "多肉/growth-study-v1/adult/idle1.png",
+          "anchor": {
+            "centerX": 625.0,
+            "footY": 1193,
+            "potWidth": 783
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "happy1",
+          "file": "多肉/growth-study-v1/adult/happy1.png",
+          "anchor": {
+            "centerX": 625.5,
+            "footY": 1194,
+            "potWidth": 786
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "thirsty1",
+          "file": "多肉/growth-study-v1/adult/thirsty1.png",
+          "anchor": {
+            "centerX": 625.0,
+            "footY": 1194,
+            "potWidth": 787
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "water1",
+          "file": "多肉/growth-study-v1/adult/water1.png",
+          "anchor": {
+            "centerX": 625.5,
+            "footY": 1192,
+            "potWidth": 782
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sun1",
+          "file": "多肉/growth-study-v1/adult/sun1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1194,
+            "potWidth": 792
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sleep1",
+          "file": "多肉/growth-study-v1/adult/sleep1.png",
+          "anchor": {
+            "centerX": 625.0,
+            "footY": 1192,
+            "potWidth": 783
+          }
+        },
+        {
+          "stage": "full",
+          "name": "idle1",
+          "file": "多肉/growth-study-v1/full/idle1.png",
+          "anchor": {
+            "centerX": 620.0,
+            "footY": 1166,
+            "potWidth": 799
+          }
+        },
+        {
+          "stage": "full",
+          "name": "happy1",
+          "file": "多肉/growth-study-v1/full/happy1.png",
+          "anchor": {
+            "centerX": 619.5,
+            "footY": 1167,
+            "potWidth": 806
+          }
+        },
+        {
+          "stage": "full",
+          "name": "thirsty1",
+          "file": "多肉/growth-study-v1/full/thirsty1.png",
+          "anchor": {
+            "centerX": 620.0,
+            "footY": 1167,
+            "potWidth": 805
+          }
+        },
+        {
+          "stage": "full",
+          "name": "water1",
+          "file": "多肉/growth-study-v1/full/water1.png",
+          "anchor": {
+            "centerX": 620.0,
+            "footY": 1167,
+            "potWidth": 799
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sun1",
+          "file": "多肉/growth-study-v1/full/sun-clean1.png",
+          "anchor": {
+            "centerX": 620.0,
+            "footY": 1167,
+            "potWidth": 803
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sleep1",
+          "file": "多肉/growth-study-v1/full/sleep1.png",
+          "anchor": {
+            "centerX": 619.5,
+            "footY": 1167,
+            "potWidth": 802
+          }
+        }
+      ]
     },
     {
-      "stage": "juvenile",
-      "name": "water1",
-      "file": "绿萝/growth-study-v1/juvenile/water1.png",
-      "anchor": {
-        "centerX": 597,
-        "footY": 1109,
-        "potWidth": 555
-      }
+      "code": "cactus",
+      "frames": [
+        {
+          "stage": "juvenile",
+          "name": "idle1",
+          "file": "仙人球/growth-study-v1/juvenile/idle1.png",
+          "anchor": {
+            "centerX": 625.0,
+            "footY": 1193,
+            "potWidth": 731
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "happy1",
+          "file": "仙人球/growth-study-v1/juvenile/happy1.png",
+          "anchor": {
+            "centerX": 625.5,
+            "footY": 1195,
+            "potWidth": 736
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "thirsty1",
+          "file": "仙人球/growth-study-v1/juvenile/thirsty1.png",
+          "anchor": {
+            "centerX": 626.0,
+            "footY": 1193,
+            "potWidth": 733
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "water1",
+          "file": "仙人球/growth-study-v1/juvenile/water1.png",
+          "anchor": {
+            "centerX": 625.5,
+            "footY": 1192,
+            "potWidth": 730
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sun1",
+          "file": "仙人球/growth-study-v1/juvenile/sun1.png",
+          "anchor": {
+            "centerX": 625.0,
+            "footY": 1193,
+            "potWidth": 733
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sleep1",
+          "file": "仙人球/growth-study-v1/juvenile/sleep1.png",
+          "anchor": {
+            "centerX": 626.0,
+            "footY": 1194,
+            "potWidth": 733
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "idle1",
+          "file": "仙人球/growth-study-v1/adult/idle1.png",
+          "anchor": {
+            "centerX": 622.5,
+            "footY": 1184,
+            "potWidth": 718
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "happy1",
+          "file": "仙人球/growth-study-v1/adult/happy1.png",
+          "anchor": {
+            "centerX": 623.0,
+            "footY": 1186,
+            "potWidth": 725
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "thirsty1",
+          "file": "仙人球/growth-study-v1/adult/thirsty1.png",
+          "anchor": {
+            "centerX": 623.0,
+            "footY": 1183,
+            "potWidth": 717
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "water1",
+          "file": "仙人球/growth-study-v1/adult/water1.png",
+          "anchor": {
+            "centerX": 622.5,
+            "footY": 1186,
+            "potWidth": 722
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sun1",
+          "file": "仙人球/growth-study-v1/adult/sun1.png",
+          "anchor": {
+            "centerX": 623.0,
+            "footY": 1185,
+            "potWidth": 721
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sleep1",
+          "file": "仙人球/growth-study-v1/adult/sleep1.png",
+          "anchor": {
+            "centerX": 623.0,
+            "footY": 1185,
+            "potWidth": 723
+          }
+        },
+        {
+          "stage": "full",
+          "name": "idle1",
+          "file": "仙人球/growth-study-v1/full/idle1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1186,
+            "potWidth": 734
+          }
+        },
+        {
+          "stage": "full",
+          "name": "happy1",
+          "file": "仙人球/growth-study-v1/full/happy1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1187,
+            "potWidth": 736
+          }
+        },
+        {
+          "stage": "full",
+          "name": "thirsty1",
+          "file": "仙人球/growth-study-v1/full/thirsty1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1185,
+            "potWidth": 732
+          }
+        },
+        {
+          "stage": "full",
+          "name": "water1",
+          "file": "仙人球/growth-study-v1/full/water-clean1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1186,
+            "potWidth": 734
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sun1",
+          "file": "仙人球/growth-study-v1/full/sun1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1185,
+            "potWidth": 732
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sleep1",
+          "file": "仙人球/growth-study-v1/full/sleep1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1186,
+            "potWidth": 734
+          }
+        }
+      ]
     },
     {
-      "stage": "juvenile",
-      "name": "sun1",
-      "file": "绿萝/growth-study-v1/juvenile/sun1.png",
-      "anchor": {
-        "centerX": 597.5,
-        "footY": 1108,
-        "potWidth": 558
-      }
-    },
-    {
-      "stage": "juvenile",
-      "name": "sleep1",
-      "file": "绿萝/growth-study-v1/juvenile/sleep1.png",
-      "anchor": {
-        "centerX": 597,
-        "footY": 1108,
-        "potWidth": 557
-      }
-    },
-    {
-      "stage": "adult",
-      "name": "idle1",
-      "file": "绿萝/growth-study-v1/adult/idle1.png",
-      "anchor": {
-        "centerX": 623.5,
-        "footY": 1169,
-        "potWidth": 600
-      }
-    },
-    {
-      "stage": "adult",
-      "name": "happy1",
-      "file": "绿萝/growth-study-v1/adult/happy1.png",
-      "anchor": {
-        "centerX": 625,
-        "footY": 1170,
-        "potWidth": 601
-      }
-    },
-    {
-      "stage": "adult",
-      "name": "thirsty1",
-      "file": "绿萝/growth-study-v1/adult/thirsty1.png",
-      "anchor": {
-        "centerX": 624,
-        "footY": 1169,
-        "potWidth": 601
-      }
-    },
-    {
-      "stage": "adult",
-      "name": "water1",
-      "file": "绿萝/growth-study-v1/adult/water1.png",
-      "anchor": {
-        "centerX": 625,
-        "footY": 1169,
-        "potWidth": 599
-      }
-    },
-    {
-      "stage": "adult",
-      "name": "sun1",
-      "file": "绿萝/growth-study-v1/adult/sun1.png",
-      "anchor": {
-        "centerX": 623.5,
-        "footY": 1169,
-        "potWidth": 600
-      }
-    },
-    {
-      "stage": "adult",
-      "name": "sleep1",
-      "file": "绿萝/growth-study-v1/adult/sleep1.png",
-      "anchor": {
-        "centerX": 624,
-        "footY": 1169,
-        "potWidth": 599
-      }
-    },
-    {
-      "stage": "full",
-      "name": "idle1",
-      "file": "绿萝/growth-study-v1/full/idle1.png",
-      "anchor": {
-        "centerX": 624,
-        "footY": 1171,
-        "potWidth": 587
-      }
-    },
-    {
-      "stage": "full",
-      "name": "happy1",
-      "file": "绿萝/growth-study-v1/full/happy1.png",
-      "anchor": {
-        "centerX": 624,
-        "footY": 1172,
-        "potWidth": 587
-      }
-    },
-    {
-      "stage": "full",
-      "name": "thirsty1",
-      "file": "绿萝/growth-study-v1/full/thirsty1.png",
-      "anchor": {
-        "centerX": 623,
-        "footY": 1171,
-        "potWidth": 587
-      }
-    },
-    {
-      "stage": "full",
-      "name": "water1",
-      "file": "绿萝/growth-study-v1/full/water1.png",
-      "anchor": {
-        "centerX": 624,
-        "footY": 1172,
-        "potWidth": 589
-      }
-    },
-    {
-      "stage": "full",
-      "name": "sun1",
-      "file": "绿萝/growth-study-v1/full/sun1.png",
-      "anchor": {
-        "centerX": 624,
-        "footY": 1171,
-        "potWidth": 587
-      }
-    },
-    {
-      "stage": "full",
-      "name": "sleep1",
-      "file": "绿萝/growth-study-v1/full/sleep1.png",
-      "anchor": {
-        "centerX": 624,
-        "footY": 1171,
-        "potWidth": 587
-      }
+      "code": "foxtail-grass",
+      "frames": [
+        {
+          "stage": "juvenile",
+          "name": "idle1",
+          "file": "狗尾巴草/growth-study-v1/juvenile/idle1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1158,
+            "potWidth": 596
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "happy1",
+          "file": "狗尾巴草/growth-study-v1/juvenile/happy1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1136,
+            "potWidth": 598
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "thirsty1",
+          "file": "狗尾巴草/growth-study-v1/juvenile/thirsty1.png",
+          "anchor": {
+            "centerX": 627.0,
+            "footY": 1158,
+            "potWidth": 599
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "water1",
+          "file": "狗尾巴草/growth-study-v1/juvenile/water1.png",
+          "anchor": {
+            "centerX": 626.0,
+            "footY": 1127,
+            "potWidth": 599
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sun1",
+          "file": "狗尾巴草/growth-study-v1/juvenile/sun1.png",
+          "anchor": {
+            "centerX": 627.0,
+            "footY": 1159,
+            "potWidth": 601
+          }
+        },
+        {
+          "stage": "juvenile",
+          "name": "sleep1",
+          "file": "狗尾巴草/growth-study-v1/juvenile/sleep1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1158,
+            "potWidth": 598
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "idle1",
+          "file": "狗尾巴草/growth-study-v1/adult/idle1.png",
+          "anchor": {
+            "centerX": 626.0,
+            "footY": 1210,
+            "potWidth": 597
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "happy1",
+          "file": "狗尾巴草/growth-study-v1/adult/happy1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1211,
+            "potWidth": 600
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "thirsty1",
+          "file": "狗尾巴草/growth-study-v1/adult/thirsty1.png",
+          "anchor": {
+            "centerX": 626.0,
+            "footY": 1212,
+            "potWidth": 601
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "water1",
+          "file": "狗尾巴草/growth-study-v1/adult/water-clean1.png",
+          "anchor": {
+            "centerX": 626.0,
+            "footY": 1211,
+            "potWidth": 601
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sun1",
+          "file": "狗尾巴草/growth-study-v1/adult/sun1.png",
+          "anchor": {
+            "centerX": 626.0,
+            "footY": 1210,
+            "potWidth": 597
+          }
+        },
+        {
+          "stage": "adult",
+          "name": "sleep1",
+          "file": "狗尾巴草/growth-study-v1/adult/sleep1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1211,
+            "potWidth": 604
+          }
+        },
+        {
+          "stage": "full",
+          "name": "idle1",
+          "file": "狗尾巴草/growth-study-v1/full/idle1.png",
+          "anchor": {
+            "centerX": 627.0,
+            "footY": 1207,
+            "potWidth": 597
+          }
+        },
+        {
+          "stage": "full",
+          "name": "happy1",
+          "file": "狗尾巴草/growth-study-v1/full/happy1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1208,
+            "potWidth": 600
+          }
+        },
+        {
+          "stage": "full",
+          "name": "thirsty1",
+          "file": "狗尾巴草/growth-study-v1/full/thirsty1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1209,
+            "potWidth": 590
+          }
+        },
+        {
+          "stage": "full",
+          "name": "water1",
+          "file": "狗尾巴草/growth-study-v1/full/water-clean1.png",
+          "anchor": {
+            "centerX": 627.0,
+            "footY": 1207,
+            "potWidth": 595
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sun1",
+          "file": "狗尾巴草/growth-study-v1/full/sun1.png",
+          "anchor": {
+            "centerX": 626.5,
+            "footY": 1209,
+            "potWidth": 598
+          }
+        },
+        {
+          "stage": "full",
+          "name": "sleep1",
+          "file": "狗尾巴草/growth-study-v1/full/sleep1.png",
+          "anchor": {
+            "centerX": 627.0,
+            "footY": 1209,
+            "potWidth": 601
+          }
+        }
+      ]
     }
   ]
 }

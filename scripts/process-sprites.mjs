@@ -386,7 +386,10 @@ function resizeBilinear(rgba, width, height, target) {
 
 // 支持按物种过滤：既有物种 stage0 里有手工改名修正的帧（见 AGENTS.md 已知坑），全量重切会覆盖掉修正
 const HAS_GROWTH_ONLY = process.argv.includes('--growth-only')
+const HAS_PREVIEW = process.argv.includes('--preview')
 const ONLY = process.argv.slice(2).filter((arg) => !arg.startsWith('--'))
+if (HAS_PREVIEW && !HAS_GROWTH_ONLY) throw new Error('--preview 仅能与 --growth-only 一起使用')
+const GROWTH_OUT_DIR = HAS_PREVIEW ? resolve(ROOT, 'test/growth-preview') : OUT_DIR
 
 function normalizeGrowthSprite({ rgba, width, height, anchor, targetPotWidth }) {
   const output = Buffer.alloc(TARGET * TARGET * 4)
@@ -427,23 +430,75 @@ function normalizeGrowthSprite({ rgba, width, height, anchor, targetPotWidth }) 
 
 function processGrowthSprites() {
   const map = JSON.parse(readFileSync(resolve(ROOT, 'scripts/growth-sprites.json'), 'utf8'))
-  if (ONLY.length && !ONLY.includes(map.species)) return
-  for (const { stage, name, file, anchor } of map.frames) {
-    if (!['juvenile', 'adult', 'full'].includes(stage) || !/^[a-z]+\d+$/.test(name))
-      throw new Error('阶段素材映射不合法')
-    const { width, height, rgba } = decodePng(readFileSync(resolve(SRC_DIR, file)))
-    const output = normalizeGrowthSprite({
-      rgba,
-      width,
-      height,
-      anchor,
-      targetPotWidth: map.targetPotWidth,
-    })
-    const outDir = resolve(OUT_DIR, map.species, stage)
-    mkdirSync(outDir, { recursive: true })
-    writeFileSync(resolve(outDir, `${name}.png`), encodePng(output, TARGET, TARGET))
-    console.log(`${map.species}/${stage}/${name}.png`)
+  const speciesMaps = map.species.filter(({ code }) => !ONLY.length || ONLY.includes(code))
+  for (const code of ONLY) {
+    if (!speciesMaps.some((entry) => entry.code === code))
+      throw new Error(`没有找到 ${code} 的阶段素材映射`)
   }
+  if (!HAS_PREVIEW) {
+    for (const { code, frames } of speciesMaps) validateGrowthFrameSet({ code, frames })
+  }
+  for (const { code, frames } of speciesMaps) {
+    for (const frame of frames) {
+      processGrowthFrame({ code, frame, targetPotWidth: map.targetPotWidth })
+    }
+  }
+}
+
+function validateGrowthFrameSet({ code, frames }) {
+  const keys = new Set(frames.map(({ stage, name }) => `${stage}/${name}`))
+  const states = ['idle1', 'happy1', 'thirsty1', 'water1', 'sun1', 'sleep1']
+  const hasAllFrames = ['juvenile', 'adult', 'full'].every((stage) =>
+    states.every((name) => keys.has(`${stage}/${name}`)),
+  )
+  if (frames.length !== 18 || keys.size !== 18 || !hasAllFrames)
+    throw new Error(`${code} 必须包含三阶段各六状态，共 18 条不重复映射；候选预览请加 --preview`)
+}
+
+function processGrowthFrame({ code, frame, targetPotWidth }) {
+  const { stage, name, file, anchor } = frame
+  if (!['juvenile', 'adult', 'full'].includes(stage) || !/^[a-z]+\d+$/.test(name))
+    throw new Error('阶段素材映射不合法')
+  if (
+    !anchor ||
+    ![anchor.centerX, anchor.footY, anchor.potWidth, targetPotWidth].every(Number.isFinite) ||
+    anchor.potWidth <= 0 ||
+    targetPotWidth <= 0
+  )
+    throw new Error(`${code}/${stage}/${name} 的花盆/脚底锚点不合法`)
+  const { width, height, rgba } = decodePng(readFileSync(resolve(SRC_DIR, file)))
+  if (anchor.centerX < 0 || anchor.centerX >= width || anchor.footY < 0 || anchor.footY >= height)
+    throw new Error(`${code}/${stage}/${name} 的锚点超出原图`)
+  validateGrowthBounds({
+    rgba,
+    width,
+    height,
+    anchor,
+    targetPotWidth,
+    label: `${code}/${stage}/${name}`,
+  })
+  const output = normalizeGrowthSprite({ rgba, width, height, anchor, targetPotWidth })
+  const outDir = resolve(GROWTH_OUT_DIR, code, stage)
+  mkdirSync(outDir, { recursive: true })
+  writeFileSync(resolve(outDir, `${name}.png`), encodePng(output, TARGET, TARGET))
+  console.log(`${code}/${stage}/${name}.png`)
+}
+
+function validateGrowthBounds({ rgba, width, height, anchor, targetPotWidth, label }) {
+  const scale = targetPotWidth / anchor.potWidth
+  let hasVisiblePixel = false
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // 忽略生成原图中肉眼不可见的 alpha 噪点，但保留叶片和特效边缘。
+      if (rgba[(y * width + x) * 4 + 3] <= 16) continue
+      hasVisiblePixel = true
+      const targetX = TARGET / 2 + (x - anchor.centerX) * scale
+      const targetY = TARGET - 20 + (y - anchor.footY) * scale
+      if (targetX < 2 || targetX > TARGET - 3 || targetY < 2 || targetY > TARGET - 3)
+        throw new Error(`${label} 归一化后会触边或裁切，请调整原图株形或核对锚点`)
+    }
+  }
+  if (!hasVisiblePixel) throw new Error(`${label} 原图没有可见内容`)
 }
 
 if (HAS_GROWTH_ONLY) processGrowthSprites()
@@ -460,4 +515,5 @@ for (const { dir, file, species, name } of MAP) {
   writeFileSync(resolve(outDir, `${name}.png`), encodePng(out, TARGET, TARGET))
   console.log(`${species}/${name}.png  <-  ${dir}/${file} (${width}x${height})`)
 }
-console.log(`done -> ${OUT_DIR}${ONLY.length ? `（仅 ${ONLY.join('、')}）` : ''}`)
+const outputDir = HAS_GROWTH_ONLY ? GROWTH_OUT_DIR : OUT_DIR
+console.log(`done -> ${outputDir}${ONLY.length ? `（仅 ${ONLY.join('、')}）` : ''}`)
