@@ -6,38 +6,82 @@ const BACKOFF_MS = [2000, 4000, 8000]
 const IMAGE_TIMEOUT_MS = 120000
 const CHAT_TIMEOUT_MS = 120000
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(finish, ms)
+    function finish(): void {
+      signal?.removeEventListener('abort', cancel)
+      resolve()
+    }
+    function cancel(): void {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', cancel)
+      reject(new DOMException('操作已取消', 'AbortError'))
+    }
+    signal?.addEventListener('abort', cancel, { once: true })
+  })
+}
 
 interface ArkCallOptions {
   apiKey: string
   label?: string
+  signal?: AbortSignal
 }
 
-async function arkPost(path: string, body: unknown, opts: ArkCallOptions, timeoutMs: number): Promise<unknown> {
+async function requestOnce(path: string, body: unknown, opts: ArkCallOptions, timeoutMs: number) {
+  opts.signal?.throwIfAborted()
+  const controller = new AbortController()
+  function abort(): void {
+    controller.abort()
+  }
+  opts.signal?.addEventListener('abort', abort, { once: true })
+  const timer = setTimeout(abort, timeoutMs)
+  try {
+    const response = await tauriFetch(`${ARK_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    const text = await response.text()
+    return { response, text }
+  } finally {
+    clearTimeout(timer)
+    opts.signal?.removeEventListener('abort', abort)
+  }
+}
+
+async function arkPost(
+  path: string,
+  body: unknown,
+  opts: ArkCallOptions,
+  timeoutMs: number,
+): Promise<unknown> {
   const label = opts.label ?? path
   for (let attempt = 1; ; attempt++) {
     let res: Response
+    let text: string
     try {
-      res = await tauriFetch(`${ARK_BASE_URL}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      })
+      const result = await requestOnce(path, body, opts, timeoutMs)
+      res = result.response
+      text = result.text
     } catch (err) {
-      if (attempt > BACKOFF_MS.length) throw new Error(`${label} 网络错误（重试后仍失败）：${String(err)}`)
-      await sleep(BACKOFF_MS[attempt - 1])
+      opts.signal?.throwIfAborted()
+      if (attempt > BACKOFF_MS.length)
+        throw new Error(`${label} 网络错误（重试后仍失败），请检查连接或稍后重试。`)
+      await sleep(BACKOFF_MS[attempt - 1], opts.signal)
       continue
     }
     if (res.status === 401 || res.status === 403) {
       throw new Error(`鉴权失败（HTTP ${res.status}）：请在 AI 弹窗中检查素材密钥`)
     }
     if (res.status === 429 || res.status >= 500) {
-      if (attempt > BACKOFF_MS.length) throw new Error(`${label} HTTP ${res.status}（重试后仍失败）`)
-      await sleep(BACKOFF_MS[attempt - 1])
+      if (attempt > BACKOFF_MS.length)
+        throw new Error(`${label} HTTP ${res.status}（重试后仍失败）`)
+      await sleep(BACKOFF_MS[attempt - 1], opts.signal)
       continue
     }
-    const text = await res.text()
     let json: unknown = null
     try {
       json = JSON.parse(text)
@@ -47,12 +91,12 @@ async function arkPost(path: string, body: unknown, opts: ArkCallOptions, timeou
     if (!res.ok) {
       // 方舟错误信封 {"error":{"code","message"}}：code（如 DataInspectionFailed / ModelNotOpen）
       // 是排查关键，必须带出，上游 operationError 按它分类提示
-      const err = (json as { error?: { code?: string, message?: string } } | null)?.error
-      const code = typeof err?.code === 'string' && err.code.trim() ? err.code.trim() : null
-      const msg = err?.message
-        ?? (json as { message?: string } | null)?.message
-        ?? text.slice(0, 200)
-      throw new Error(`HTTP ${res.status}${code ? `（${code}）` : ''}：${msg}`)
+      const err = (json as { error?: { code?: string; message?: string } } | null)?.error
+      const code =
+        typeof err?.code === 'string' && /^[A-Za-z0-9_.-]{1,80}$/.test(err.code) ? err.code : null
+      throw new Error(
+        `${label} HTTP ${res.status}${code ? `（${code}）` : ''}：请求未完成，请重试。`,
+      )
     }
     return json
   }
@@ -82,7 +126,7 @@ function chatBody(model: string, messages: ChatMessage[], jsonMode: boolean): un
 export function chatContent(json: unknown): string {
   const obj = json as {
     output_text?: string
-    output?: Array<{ type?: string, content?: Array<{ text?: string }> }>
+    output?: Array<{ type?: string; content?: Array<{ text?: string }> }>
     choices?: Array<{ message?: { content?: string } }>
   } | null
   if (typeof obj?.output_text === 'string' && obj.output_text) return obj.output_text
@@ -99,8 +143,15 @@ export function chatContent(json: unknown): string {
 
 const CHAT_MODEL = 'doubao-seed-2-1-lite-260915'
 
-export async function arkChat(opts: ArkCallOptions & { messages: ChatMessage[], jsonMode: boolean }): Promise<string> {
-  const json = await arkPost('/responses', chatBody(CHAT_MODEL, opts.messages, opts.jsonMode), opts, CHAT_TIMEOUT_MS)
+export async function arkChat(
+  opts: ArkCallOptions & { messages: ChatMessage[]; jsonMode: boolean },
+): Promise<string> {
+  const json = await arkPost(
+    '/responses',
+    chatBody(CHAT_MODEL, opts.messages, opts.jsonMode),
+    opts,
+    CHAT_TIMEOUT_MS,
+  )
   return chatContent(json)
 }
 
@@ -109,10 +160,12 @@ export async function arkChat(opts: ArkCallOptions & { messages: ChatMessage[], 
 export const IMAGE_MODEL = 'doubao-seedream-5-0-flash-260915'
 export const IMAGE_SIZE = '1024x1024'
 
-export async function arkGenerateImage(opts: ArkCallOptions & {
-  prompt: string
-  refDataUrl: string
-}): Promise<Uint8Array> {
+export async function arkGenerateImage(
+  opts: ArkCallOptions & {
+    prompt: string
+    refDataUrl: string
+  },
+): Promise<Uint8Array> {
   const json = (await arkPost(
     '/images/generations',
     {
@@ -127,15 +180,13 @@ export async function arkGenerateImage(opts: ArkCallOptions & {
     },
     opts,
     IMAGE_TIMEOUT_MS,
-  )) as { data?: Array<{ url?: string, b64_json?: string }> } | null
+  )) as { data?: Array<{ url?: string; b64_json?: string }> } | null
   const item = json?.data?.[0]
   if (item?.b64_json) {
     return base64ToBytes(item.b64_json)
   }
   if (item?.url) {
-    const res = await tauriFetch(item.url, { method: 'GET', signal: AbortSignal.timeout(60000) })
-    if (!res.ok) throw new Error(`图片下载失败 HTTP ${res.status}`)
-    return new Uint8Array(await res.arrayBuffer())
+    throw new Error('图片接口未返回内联 PNG，请重试；不下载未经校验的远程图片地址。')
   }
   throw new Error('生图响应解析不出图片')
 }

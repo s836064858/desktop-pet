@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useCareStore } from '../../stores/care'
 import { listSpeciesCards } from '../../lib/speciesRegistry'
 import type { SpeciesCardItem } from '../../lib/speciesRegistry'
+import { disposeSpeciesUrls } from '../../lib/spriteLibrary'
 import PlantOverview from './PlantOverview.vue'
 import CareTaskList from './CareTaskList.vue'
 import PlantAdoption from './PlantAdoption.vue'
 import SpeciesForgeDialog from './SpeciesForgeDialog.vue'
+import PlantHabits from './PlantHabits.vue'
 
+const GrowthDebugPanel = import.meta.env.DEV
+  ? defineAsyncComponent(() => import('./GrowthDebugPanel.vue'))
+  : null
 const careStore = useCareStore()
 const speciesCards = shallowRef<SpeciesCardItem[]>([])
 const isForgeVisible = shallowRef(false)
@@ -17,13 +22,17 @@ const adoptedSpecies = computed(() =>
   speciesCards.value.find((item) => item.code === careStore.plant?.species_code),
 )
 let loadVersion = 0
+let speciesController: AbortController | null = null
 
 async function refreshCards(): Promise<void> {
   const version = ++loadVersion
+  speciesController?.abort()
+  const controller = new AbortController()
+  speciesController = controller
   isLoadingSpecies.value = true
   speciesError.value = ''
   try {
-    const cards = await listSpeciesCards()
+    const cards = await listSpeciesCards({ signal: controller.signal })
     if (version === loadVersion) speciesCards.value = cards
   } catch {
     if (version === loadVersion) speciesError.value = '物种列表加载失败，请重试。'
@@ -38,6 +47,8 @@ onMounted(() => {
 })
 onUnmounted(() => {
   loadVersion += 1
+  speciesController?.abort()
+  disposeSpeciesUrls()
   careStore.dispose()
 })
 </script>
@@ -52,19 +63,33 @@ onUnmounted(() => {
       {{ careStore.loadError }} <el-button text @click="careStore.refresh">重新加载</el-button>
     </div>
     <template v-else-if="careStore.plant">
+      <p v-if="speciesError" class="inline-note error-note" role="alert">
+        {{ speciesError }} <el-button text @click="refreshCards">重试</el-button>
+      </p>
       <PlantOverview
         :plant="careStore.plant"
         :species="adoptedSpecies"
         :stage-name="careStore.stageName"
-        :completed-count="careStore.completedCount"
+        :growth-days="careStore.displayGrowthDays"
+        :has-interacted-today="careStore.growth.today?.is_complete === 1"
         :balance="careStore.balance"
         :today-earned="careStore.todayEarned"
         :streak-current="careStore.streakCurrent"
       />
+      <PlantHabits v-if="careStore.growth.profile" :profile="careStore.growth.profile" />
       <CareTaskList
+        v-if="careStore.growth.profile"
+        :profile="careStore.growth.profile"
         :tasks="careStore.tasks"
-        :is-snoozing="careStore.isSnoozing"
-        @snooze="careStore.handleSnooze"
+      />
+      <component
+        :is="GrowthDebugPanel"
+        v-if="GrowthDebugPanel"
+        :key="careStore.plant.id"
+        :plant-id="careStore.plant.id"
+        :real-days="careStore.growth.days"
+        :preview-days="careStore.growth.previewDays"
+        @changed="careStore.refresh"
       />
     </template>
     <PlantAdoption

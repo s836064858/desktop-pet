@@ -1,4 +1,5 @@
 import { emit } from '@tauri-apps/api/event'
+import { warn } from '@tauri-apps/plugin-log'
 import {
   createTask,
   getLastCompletedAt,
@@ -7,16 +8,14 @@ import {
   listOpenTasks,
   markOverdue,
   markReminded,
-  SUN_INTERVAL_H,
-  WATER_INTERVAL_H,
 } from './database'
 import type { CareTask, CareTaskType, Plant } from './database'
-import { SPECIES } from '../config/species'
+import { getGrowthSnapshot } from './growthRepository'
+import type { CareProfile } from './careProfile'
 import { readSettings } from './capabilities'
 
 const TICK_MS = 15_000
 const OVERDUE_AFTER_MS = 24 * 60 * 60 * 1000
-const MIN_NEXT_DELAY_MS = 60_000
 const TASK_TYPES: CareTaskType[] = ['water', 'sun']
 
 export interface DueState {
@@ -30,118 +29,104 @@ export interface SchedulerCallbacks {
   onDueChange: (state: DueState) => void
 }
 
-export interface OpenTaskInfo {
-  task: CareTask
+interface TickContext {
   plant: Plant
+  profile: CareProfile
+  startedAt: number
+  version: number
 }
 
 let tickTimer: ReturnType<typeof setInterval> | null = null
 let isTicking = false
-let currentPlant: Plant | null = null
 let callbacks: SchedulerCallbacks | null = null
+let lifecycleVersion = 0
 let lastDueState: DueState | null = null
 
 function isDue(task: CareTask): boolean {
   return task.status === 'reminded' || task.status === 'overdue'
 }
 
-function findOpenTask(tasks: CareTask[], type: CareTaskType): CareTask | undefined {
-  return tasks.find((task) => task.type === type)
+function intervalMsOf(type: CareTaskType, profile: CareProfile): number {
+  return (type === 'water' ? profile.waterEveryDays : profile.lightEveryDays) * 86_400_000
 }
 
-function isPaused(settings: { pausedUntil: number | null }, now = Date.now()): boolean {
-  return settings.pausedUntil !== null && now < settings.pausedUntil
-}
-
-function intervalMsOf(type: CareTaskType): number {
-  const hours = type === 'water' ? WATER_INTERVAL_H : SUN_INTERVAL_H
-  return hours * 60 * 60 * 1000
-}
-
-function firstDelayMsOf(plant: Plant): number {
-  const species = SPECIES[plant.species_code]
-  return (species?.firstTaskDelayMin ?? 5) * 60_000
-}
-
-async function reconcileType(type: CareTaskType): Promise<void> {
-  if (!currentPlant) {
-    return
-  }
-  const plant = currentPlant
-  const now = Date.now()
+async function reconcileType(type: CareTaskType, context: TickContext): Promise<void> {
+  const { plant, profile, startedAt, version } = context
   let open = await getOpenTask(plant.id, type)
+  if (version !== lifecycleVersion) return
   if (!open) {
-    const lastCompletedAt = await getLastCompletedAt(plant.id, type)
-    const scheduledAt = lastCompletedAt === null
-      ? now + firstDelayMsOf(plant)
-      : lastCompletedAt + intervalMsOf(type)
-    await createTask(plant.id, type, Math.max(scheduledAt, now + MIN_NEXT_DELAY_MS))
+    const completedAt = await getLastCompletedAt(plant.id, type)
+    if (version !== lifecycleVersion) return
+    await createTask(
+      plant.id,
+      type,
+      Math.max((completedAt ?? startedAt) + intervalMsOf(type, profile), Date.now()),
+    )
     open = await getOpenTask(plant.id, type)
   }
-  if (!open) {
-    return
-  }
-  if (open.status === 'pending' && open.scheduled_at <= now) {
-    await markReminded(open.id)
-    const settings = await readSettings()
-    callbacks?.onRemind({ ...open, status: 'reminded' }, plant, isPaused(settings))
-  } else if (open.status === 'reminded' && now >= open.scheduled_at + OVERDUE_AFTER_MS) {
-    await markOverdue(open.id)
-  }
+  if (!open || version !== lifecycleVersion) return
+  await updateTaskReminder(open, context)
 }
 
-async function refreshDueState(): Promise<void> {
-  if (!currentPlant || !callbacks) {
+async function updateTaskReminder(task: CareTask, context: TickContext): Promise<void> {
+  const now = Date.now()
+  if (task.status === 'pending' && task.scheduled_at <= now) {
+    await markReminded(task.id)
+    const settings = await readSettings()
+    if (context.version !== lifecycleVersion) return
+    const isSilent = settings.pausedUntil !== null && now < settings.pausedUntil
+    callbacks?.onRemind({ ...task, status: 'reminded' }, context.plant, isSilent)
     return
   }
-  const tasks = await listOpenTasks(currentPlant.id)
-  const water = findOpenTask(tasks, 'water')
-  const sun = findOpenTask(tasks, 'sun')
+  if (task.status === 'reminded' && now >= task.scheduled_at + OVERDUE_AFTER_MS)
+    await markOverdue(task.id)
+}
+
+function publishDueState(tasks: CareTask[]): void {
   const state: DueState = {
-    water: water !== undefined && isDue(water),
-    sun: sun !== undefined && isDue(sun),
+    water: tasks.some((task) => task.type === 'water' && isDue(task)),
+    sun: tasks.some((task) => task.type === 'sun' && isDue(task)),
     hasOverdue: tasks.some((task) => task.status === 'overdue'),
   }
-  const isChanged = lastDueState === null
-    || state.water !== lastDueState.water
-    || state.sun !== lastDueState.sun
-    || state.hasOverdue !== lastDueState.hasOverdue
-  if (isChanged) {
-    lastDueState = state
-    callbacks.onDueChange(state)
+  if (
+    lastDueState &&
+    state.water === lastDueState.water &&
+    state.sun === lastDueState.sun &&
+    state.hasOverdue === lastDueState.hasOverdue
+  )
+    return
+  lastDueState = state
+  callbacks?.onDueChange(state)
+}
+
+async function reconcilePlant(version: number): Promise<void> {
+  const plant = await getPlant()
+  if (version !== lifecycleVersion) return
+  if (!plant) return publishDueState([])
+  const growth = await getGrowthSnapshot(plant.id)
+  if (version !== lifecycleVersion) return
+  if (!growth.profile) return publishDueState([])
+  const context = { plant, profile: growth.profile, startedAt: growth.startedAt, version }
+  for (const type of TASK_TYPES) {
+    if (version !== lifecycleVersion) return
+    await reconcileType(type, context)
   }
+  const tasks = await listOpenTasks(plant.id)
+  if (version === lifecycleVersion) publishDueState(tasks)
 }
 
 async function tick(): Promise<void> {
-  if (isTicking) {
-    return
-  }
+  if (isTicking || !callbacks) return
+  const version = lifecycleVersion
   isTicking = true
   try {
-    if (!currentPlant) {
-      currentPlant = await getPlant()
-    }
-    if (currentPlant) {
-      for (const type of TASK_TYPES) {
-        await reconcileType(type)
-      }
-      await refreshDueState()
-    }
-    await emit('care-changed')
+    await reconcilePlant(version)
+    if (version === lifecycleVersion) await emit('care-changed')
+  } catch {
+    await warn('[scheduler] 养护计划刷新失败，下一轮自动重试。')
   } finally {
     isTicking = false
   }
-}
-
-export async function getOpenTaskInfo(type: CareTaskType): Promise<OpenTaskInfo | null> {
-  if (!currentPlant) {
-    return null
-  }
-  const open = await getOpenTask(currentPlant.id, type)
-  if (!open) {
-    return null
-  }
-  return { task: open, plant: currentPlant }
 }
 
 export function notifyChanged(): void {
@@ -149,23 +134,21 @@ export function notifyChanged(): void {
 }
 
 export function invalidatePlant(): void {
-  currentPlant = null
+  lifecycleVersion += 1
   lastDueState = null
 }
 
 export async function startScheduler(cb: SchedulerCallbacks): Promise<void> {
+  disposeScheduler()
   callbacks = cb
-  currentPlant = await getPlant()
+  tickTimer = setInterval(notifyChanged, TICK_MS)
   await tick()
-  tickTimer = setInterval(() => {
-    void tick()
-  }, TICK_MS)
 }
 
 export function disposeScheduler(): void {
-  if (tickTimer !== null) {
-    clearInterval(tickTimer)
-    tickTimer = null
-  }
+  lifecycleVersion += 1
+  if (tickTimer !== null) clearInterval(tickTimer)
+  tickTimer = null
   callbacks = null
+  lastDueState = null
 }

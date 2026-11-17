@@ -4,6 +4,7 @@ import type { ForgeForm } from './types'
 import { FRAME_META } from './types'
 import { FRAME_KEYS } from '../../../lib/spriteStudio'
 import AppIcon from '../../common/AppIcon.vue'
+import CareProfileForm from '../CareProfileForm.vue'
 
 const props = defineProps<{
   form: ForgeForm
@@ -99,7 +100,15 @@ function updateState(frame: keyof ForgeForm['states'], value: string): void {
           /></label>
         </div>
       </details>
-      <p class="inline-note"><AppIcon name="info" :size="14" /> 养护节奏全物种统一：每 1 天浇水、每 2 天晒太阳。</p>
+      <CareProfileForm
+        :model-value="form.careProfile"
+        :is-disabled="isDisabled"
+        @update:model-value="updateField('careProfile', $event)"
+      />
+      <p class="inline-note">
+        <AppIcon name="info" :size="14" /> 习性由 AI
+        与植物设定一起起草，请核对后再生成；入库后不提供独立调整入口。
+      </p>
     </div>
     <div v-else class="draft-empty">
       <AppIcon name="leaf" :size="32" />

@@ -3,6 +3,7 @@ import { SPECIES_LIST } from '../config/species'
 import type { SpeciesConfig } from '../config/species'
 import { fileToObjectUrl, listCustomSpecies } from './spriteLibrary'
 import { getSpeciesPreviewUrl } from './speciesArt'
+import { readCareProfile } from './careProfile'
 
 export interface SpeciesCardItem extends SpeciesConfig {
   isCustom: boolean
@@ -10,18 +11,23 @@ export interface SpeciesCardItem extends SpeciesConfig {
   desc?: string
 }
 
-export async function listSpeciesCards(): Promise<SpeciesCardItem[]> {
+export async function listSpeciesCards(
+  options: { signal?: AbortSignal } = {},
+): Promise<SpeciesCardItem[]> {
+  options.signal?.throwIfAborted()
   const builtins: SpeciesCardItem[] = SPECIES_LIST.map((species) => ({
     ...species,
     isCustom: false,
     previewUrl: getSpeciesPreviewUrl(species.code),
   }))
   const customs = await listCustomSpecies()
+  options.signal?.throwIfAborted()
   const customItems: SpeciesCardItem[] = []
   for (const meta of customs) {
+    options.signal?.throwIfAborted()
     let previewUrl: string | null = null
     try {
-      previewUrl = await getCustomPreviewUrl(meta.code)
+      previewUrl = await getCustomPreviewUrl(meta.code, options.signal)
     } catch {
       previewUrl = null
     }
@@ -34,15 +40,16 @@ export async function listSpeciesCards(): Promise<SpeciesCardItem[]> {
       isCustom: true,
       previewUrl,
       desc: meta.desc,
+      careProfile: readCareProfile(meta.careProfile, meta.code),
     })
   }
   return [...builtins, ...customItems]
 }
 
-async function getCustomPreviewUrl(code: string): Promise<string> {
+async function getCustomPreviewUrl(code: string, signal?: AbortSignal): Promise<string> {
   const { join, appDataDir } = await import('@tauri-apps/api/path')
   const file = await join(await appDataDir(), 'sprite-library', code, 'stage0', 'idle1.png')
-  return fileToObjectUrl(file)
+  return fileToObjectUrl(file, signal)
 }
 
 export function builtinSpeciesCodes(): Set<string> {

@@ -1,0 +1,186 @@
+{
+  "species": "pothos",
+  "targetPotWidth": 180,
+  "frames": [
+    {
+      "stage": "juvenile",
+      "name": "idle1",
+      "file": "绿萝/growth-study-v1/juvenile/idle1.png",
+      "anchor": {
+        "centerX": 597,
+        "footY": 1108,
+        "potWidth": 555
+      }
+    },
+    {
+      "stage": "juvenile",
+      "name": "happy1",
+      "file": "绿萝/growth-study-v1/juvenile/happy1.png",
+      "anchor": {
+        "centerX": 597,
+        "footY": 1109,
+        "potWidth": 557
+      }
+    },
+    {
+      "stage": "juvenile",
+      "name": "thirsty1",
+      "file": "绿萝/growth-study-v1/juvenile/thirsty1.png",
+      "anchor": {
+        "centerX": 595.5,
+        "footY": 1109,
+        "potWidth": 554
+      }
+    },
+    {
+      "stage": "juvenile",
+      "name": "water1",
+      "file": "绿萝/growth-study-v1/juvenile/water1.png",
+      "anchor": {
+        "centerX": 597,
+        "footY": 1109,
+        "potWidth": 555
+      }
+    },
+    {
+      "stage": "juvenile",
+      "name": "sun1",
+      "file": "绿萝/growth-study-v1/juvenile/sun1.png",
+      "anchor": {
+        "centerX": 597.5,
+        "footY": 1108,
+        "potWidth": 558
+      }
+    },
+    {
+      "stage": "juvenile",
+      "name": "sleep1",
+      "file": "绿萝/growth-study-v1/juvenile/sleep1.png",
+      "anchor": {
+        "centerX": 597,
+        "footY": 1108,
+        "potWidth": 557
+      }
+    },
+    {
+      "stage": "adult",
+      "name": "idle1",
+      "file": "绿萝/growth-study-v1/adult/idle1.png",
+      "anchor": {
+        "centerX": 623.5,
+        "footY": 1169,
+        "potWidth": 600
+      }
+    },
+    {
+      "stage": "adult",
+      "name": "happy1",
+      "file": "绿萝/growth-study-v1/adult/happy1.png",
+      "anchor": {
+        "centerX": 625,
+        "footY": 1170,
+        "potWidth": 601
+      }
+    },
+    {
+      "stage": "adult",
+      "name": "thirsty1",
+      "file": "绿萝/growth-study-v1/adult/thirsty1.png",
+      "anchor": {
+        "centerX": 624,
+        "footY": 1169,
+        "potWidth": 601
+      }
+    },
+    {
+      "stage": "adult",
+      "name": "water1",
+      "file": "绿萝/growth-study-v1/adult/water1.png",
+      "anchor": {
+        "centerX": 625,
+        "footY": 1169,
+        "potWidth": 599
+      }
+    },
+    {
+      "stage": "adult",
+      "name": "sun1",
+      "file": "绿萝/growth-study-v1/adult/sun1.png",
+      "anchor": {
+        "centerX": 623.5,
+        "footY": 1169,
+        "potWidth": 600
+      }
+    },
+    {
+      "stage": "adult",
+      "name": "sleep1",
+      "file": "绿萝/growth-study-v1/adult/sleep1.png",
+      "anchor": {
+        "centerX": 624,
+        "footY": 1169,
+        "potWidth": 599
+      }
+    },
+    {
+      "stage": "full",
+      "name": "idle1",
+      "file": "绿萝/growth-study-v1/full/idle1.png",
+      "anchor": {
+        "centerX": 624,
+        "footY": 1171,
+        "potWidth": 587
+      }
+    },
+    {
+      "stage": "full",
+      "name": "happy1",
+      "file": "绿萝/growth-study-v1/full/happy1.png",
+      "anchor": {
+        "centerX": 624,
+        "footY": 1172,
+        "potWidth": 587
+      }
+    },
+    {
+      "stage": "full",
+      "name": "thirsty1",
+      "file": "绿萝/growth-study-v1/full/thirsty1.png",
+      "anchor": {
+        "centerX": 623,
+        "footY": 1171,
+        "potWidth": 587
+      }
+    },
+    {
+      "stage": "full",
+      "name": "water1",
+      "file": "绿萝/growth-study-v1/full/water1.png",
+      "anchor": {
+        "centerX": 624,
+        "footY": 1172,
+        "potWidth": 589
+      }
+    },
+    {
+      "stage": "full",
+      "name": "sun1",
+      "file": "绿萝/growth-study-v1/full/sun1.png",
+      "anchor": {
+        "centerX": 624,
+        "footY": 1171,
+        "potWidth": 587
+      }
+    },
+    {
+      "stage": "full",
+      "name": "sleep1",
+      "file": "绿萝/growth-study-v1/full/sleep1.png",
+      "anchor": {
+        "centerX": 624,
+        "footY": 1171,
+        "potWidth": 587
+      }
+    }
+  ]
+}

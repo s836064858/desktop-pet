@@ -4,6 +4,8 @@
 
 ## 本地维护文档
 
+跨会话制作植物三阶段素材，先读根目录 `SPRITE-HANDOFF.md`（随仓库提交；含当前资源、生成流程、锚点规则与待补物种）。
+
 `docs/` 仅在维护者本机保留，已取消 Git 跟踪并加入忽略规则。禁止强制添加、提交或上传该目录。新克隆仓库不包含这些文件，以本文件与 README 为协作依据；本地文档存在时，修改相关模块前应阅读对应内容：
 
 - `docs/技术方案-植物数字分身桌面宠物.md`：业务流程、分期规划、决策记录。
@@ -49,7 +51,10 @@ pnpm sprite <probe|ask|gen|commit> # 素材生图自动化（.env 配 ARK_API_KE
 - 未领养态：数据库无 plant 时宠物窗显示**空盆**（伪物种 `empty-pot`，单帧 idle，素材 `assets-src/空盆/` 经 map.json 切图，提示词条目在 `scripts/sprite-species.json`）：隐藏浇水/晒太阳按钮、不眨眼、不积好感度，互动气泡为领养引导；领养/重置经 `plant-changed` 双向切换（`petView.setUnadopted`）
 - 跨窗事件：`care-changed`（调度器每 tick 广播，面板刷新）/ `plant-changed`（领养/重置广播，宠物窗换帧 + 调度器缓存失效）
 - 计时器：调度器 15s tick（宠物窗）；互动帧切换/眨眼定时器集中在 `petView.ts`，由 `disposeViewTimers` 统一清理
-- 阶段：成熟期（默认）→ 完全体（累计完成 30 次）
+- 阶段：每天首次摸摸（抚摸或点击）、浇水或光照互动自动记 1 日；幼年体 → 成年体（14 日）→ 完全体（累计 42 日）。互动成长不额外计分、漏做不扣进度；积分仍走 `completeTask`，由 SQLite 触发器原子提交任务状态、流水、连续养护与当日成长。面板不提供独立打卡或任务操作按钮，计划仅展示时间与状态；无任务日摸摸即可成长。
+- 成长与习性：`plant_growth` 按 plant_id 初始化一次，`daily_inspection` 用 `(plant_id, day_key)` 去重；存量植物迁移为幼年，保留积分与已完成养护历史，不能调用 `resetPlant` 代替迁移。习性只包含浇水/光照各每几天一次及一段只读富文本；旧版未完成计划通过 `simplified_care_schedule` 一次性重建，不再填写观察表。AI 仅创建物种时同时生成习性；富文本只允许安全排版标签、剥离所有属性。
+- dev 成长预览：仅 `import.meta.env.DEV` 加载调试面板与 `devGrowth`，覆盖天数写入独立 `sproutkin-dev.db`；真实成长、积分与任务不变，支持恢复真实进度。正式构建必须移除调试入口与模块。
+- 阶段素材：绿萝已配三阶段 × 六状态；`node scripts/process-sprites.mjs pothos --growth-only` 按 `scripts/growth-sprites.json` 生成 400px 帧并对齐花盆与脚底。其他物种使用原有 stage0，不以缩放伪造阶段形态。
 
 ## 已知坑（改相关代码前先看）
 

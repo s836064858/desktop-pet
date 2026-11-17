@@ -3,6 +3,8 @@ import { computed, onUnmounted, shallowRef } from 'vue'
 import { useCareStore } from '../../stores/care'
 import type { SpeciesCardItem } from '../../lib/speciesRegistry'
 import AppIcon from '../common/AppIcon.vue'
+import CareProfileForm from './CareProfileForm.vue'
+import { createCareProfile } from '../../lib/careProfile'
 
 const props = defineProps<{ species: SpeciesCardItem[]; isLoading: boolean; error: string }>()
 defineEmits<{ forge: []; retry: [] }>()
@@ -11,6 +13,7 @@ const selectedCode = shallowRef('')
 const nickname = shallowRef('')
 const isAdopting = shallowRef(false)
 const formError = shallowRef('')
+const careProfile = shallowRef(createCareProfile())
 const selectedSpecies = computed(() =>
   props.species.find((item) => item.code === selectedCode.value),
 )
@@ -21,6 +24,7 @@ onUnmounted(() => {
 
 function pickSpecies(species: SpeciesCardItem): void {
   selectedCode.value = species.code
+  careProfile.value = { ...(species.careProfile ?? createCareProfile(species.code)) }
   formError.value = ''
 }
 
@@ -37,9 +41,11 @@ async function submitAdopt(): Promise<void> {
     await careStore.adopt({
       speciesCode: species.code,
       nickname: nickname.value.trim() || species.name,
+      careProfile: careProfile.value,
     })
-  } catch {
-    if (isActive) formError.value = '领养失败，请稍后重试。'
+  } catch (cause) {
+    if (isActive)
+      formError.value = cause instanceof Error ? cause.message : '领养失败，请稍后重试。'
   } finally {
     if (isActive) isAdopting.value = false
   }
@@ -81,6 +87,7 @@ async function submitAdopt(): Promise<void> {
         <span class="species-name">{{ item.name }} <small v-if="item.isCustom">AI</small></span>
       </button>
     </div>
+    <CareProfileForm v-if="selectedSpecies" v-model="careProfile" :is-disabled="isAdopting" />
     <form class="adopt-form" @submit.prevent="submitAdopt">
       <label class="field-label name-field"
         ><span>给它起个名字</span
@@ -98,7 +105,9 @@ async function submitAdopt(): Promise<void> {
         >确认领养</el-button
       >
     </form>
-    <p class="muted">所有植物遵循统一的养护节奏：每 1 天浇水、每 2 天晒太阳。</p>
+    <p class="muted">
+      确认领养也会保存上述习性。每天首次摸摸、浇水或光照自动累计成长，14 日成年、累计 42 日完全体。
+    </p>
     <p v-if="formError" class="inline-note error-note" role="alert">{{ formError }}</p>
   </section>
 </template>

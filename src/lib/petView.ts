@@ -1,5 +1,6 @@
 import { getSpeciesFrame, hasSpeciesArt } from './speciesArt'
 import type { FrameName } from './speciesArt'
+import type { GrowthStage } from './growth'
 
 export type NeedType = 'water' | 'sun'
 export type BaseState = 'idle' | 'thirsty'
@@ -10,9 +11,14 @@ const FALLBACK_SPECIES = 'pothos'
 const UNADOPTED_SPECIES = 'empty-pot'
 let currentSpecies = FALLBACK_SPECIES
 let isUnadopted = false
+let currentStage: GrowthStage = 'juvenile'
+let transientVersion = 0
+let resolveTransient: (() => void) | null = null
 
 export function setSpeciesFrames(speciesCode: string): void {
+  cancelTransient()
   currentSpecies = hasSpeciesArt(speciesCode) ? speciesCode : FALLBACK_SPECIES
+  currentStage = 'juvenile'
 }
 
 export function isUnadoptedView(): boolean {
@@ -25,15 +31,10 @@ export function setUnadopted(view: PetViewElements, on: boolean): void {
   if (!on) {
     return
   }
-  if (transientTimer !== null) {
-    clearTimeout(transientTimer)
-    transientTimer = null
-  }
-  isViewBusy = false
-  if (blinkTimer !== null) {
-    clearTimeout(blinkTimer)
-    blinkTimer = null
-  }
+  cancelTransient()
+  if (blinkTimer !== null) clearInterval(blinkTimer)
+  blinkTimer = null
+  isBlinking = false
   const frame = getSpeciesFrame(UNADOPTED_SPECIES, 'idle')
   if (frame) {
     view.img.src = frame
@@ -43,7 +44,9 @@ export function setUnadopted(view: PetViewElements, on: boolean): void {
 }
 
 function frameOf(name: FrameName): string {
-  const frame = getSpeciesFrame(currentSpecies, name) ?? getSpeciesFrame(FALLBACK_SPECIES, name)
+  const frame =
+    getSpeciesFrame(currentSpecies, name, currentStage) ??
+    getSpeciesFrame(FALLBACK_SPECIES, name, currentStage)
   if (!frame) {
     throw new Error(`缺少帧资源：${currentSpecies}/${name}`)
   }
@@ -53,7 +56,7 @@ function frameOf(name: FrameName): string {
 const BUBBLE_HOLD_MS = 1900
 const BOUNCE_HOLD_MS = 550
 const BLINK_HOLD_MS = 130
-const STAGE_SCALES = [1, 1.08]
+const STAGE_CODES: GrowthStage[] = ['juvenile', 'adult', 'full']
 const MAX_HEARTS = 8
 
 export interface PetViewElements {
@@ -69,7 +72,10 @@ let baseState: BaseState = 'idle'
 let transientTimer: ReturnType<typeof setTimeout> | null = null
 let bounceTimer: ReturnType<typeof setTimeout> | null = null
 let bubbleTimer: ReturnType<typeof setTimeout> | null = null
-let blinkTimer: ReturnType<typeof setTimeout> | null = null
+let blinkTimer: ReturnType<typeof setInterval> | null = null
+let isBlinking = false
+let nextBlinkAt = 0
+let blinkEndsAt = 0
 let isViewBusy = false
 
 export function collectPetView(): PetViewElements | null {
@@ -94,8 +100,13 @@ export function collectPetView(): PetViewElements | null {
   }
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function cancelTransient(): void {
+  transientVersion += 1
+  if (transientTimer !== null) clearTimeout(transientTimer)
+  transientTimer = null
+  resolveTransient?.()
+  resolveTransient = null
+  isViewBusy = false
 }
 
 function applyFrame(view: PetViewElements, name: FrameName): void {
@@ -110,16 +121,25 @@ export function setBaseState(view: PetViewElements, state: BaseState): void {
   applyFrame(view, state)
 }
 
-export async function flashFrame(view: PetViewElements, name: FrameName, holdMs: number): Promise<void> {
+export async function flashFrame(
+  view: PetViewElements,
+  name: FrameName,
+  holdMs: number,
+): Promise<void> {
   if (isUnadopted) {
     return
   }
+  cancelTransient()
+  const version = transientVersion
   isViewBusy = true
   applyFrame(view, name)
-  if (transientTimer !== null) {
-    clearTimeout(transientTimer)
-  }
-  await wait(holdMs)
+  await new Promise<void>((resolve) => {
+    resolveTransient = resolve
+    transientTimer = setTimeout(resolve, holdMs)
+  })
+  if (version !== transientVersion || isUnadopted) return
+  transientTimer = null
+  resolveTransient = null
   isViewBusy = false
   applyFrame(view, baseState)
 }
@@ -146,8 +166,11 @@ export function setNeedDue(view: PetViewElements, type: NeedType, isDue: boolean
 }
 
 export function applyStage(view: PetViewElements, stageIndex: number): void {
-  const scale = STAGE_SCALES[stageIndex] ?? 1
-  view.plant.style.setProperty('--stage-scale', String(scale))
+  const stage = STAGE_CODES[stageIndex] ?? 'juvenile'
+  if (stage !== currentStage) cancelTransient()
+  currentStage = stage
+  view.plant.style.setProperty('--stage-scale', '1')
+  if (!isUnadopted && !isViewBusy) applyFrame(view, baseState)
 }
 
 export function applySpeciesHue(view: PetViewElements, hue: number): void {
@@ -181,46 +204,35 @@ export function spawnHearts(view: PetViewElements, count: number): void {
   }
 }
 
-function scheduleBlink(view: PetViewElements): void {
-  const delay = 2800 + Math.random() * 2400
-  blinkTimer = setTimeout(() => {
-    if (!isViewBusy && baseState === 'idle') {
-      applyFrame(view, 'sleep')
-      setTimeout(() => {
-        if (!isViewBusy && baseState === 'idle') {
-          applyFrame(view, 'idle')
-        }
-        scheduleBlink(view)
-      }, BLINK_HOLD_MS)
-      return
-    }
-    scheduleBlink(view)
-  }, delay)
+function tickBlink(view: PetViewElements): void {
+  const now = Date.now()
+  if (isBlinking && now >= blinkEndsAt) {
+    isBlinking = false
+    nextBlinkAt = now + 2800 + Math.random() * 2400
+    if (!isViewBusy && baseState === 'idle' && !isUnadopted) applyFrame(view, 'idle')
+    return
+  }
+  if (!isBlinking && now >= nextBlinkAt && !isViewBusy && baseState === 'idle' && !isUnadopted) {
+    isBlinking = true
+    blinkEndsAt = now + BLINK_HOLD_MS
+    applyFrame(view, 'sleep')
+  }
 }
 
 export function startBlink(view: PetViewElements): void {
-  if (blinkTimer !== null || isUnadopted) {
-    return
-  }
-  scheduleBlink(view)
+  if (blinkTimer !== null || isUnadopted) return
+  nextBlinkAt = Date.now() + 4000
+  // 单个托管时钟驱动闭眼与恢复，不在定时回调中再次注册定时器。
+  blinkTimer = setInterval(() => tickBlink(view), BLINK_HOLD_MS)
 }
 
 export function disposeViewTimers(): void {
-  if (transientTimer !== null) {
-    clearTimeout(transientTimer)
-    transientTimer = null
-  }
-  if (bounceTimer !== null) {
-    clearTimeout(bounceTimer)
-    bounceTimer = null
-  }
-  if (bubbleTimer !== null) {
-    clearTimeout(bubbleTimer)
-    bubbleTimer = null
-  }
-  if (blinkTimer !== null) {
-    clearTimeout(blinkTimer)
-    blinkTimer = null
-  }
-  isViewBusy = false
+  cancelTransient()
+  if (bounceTimer !== null) clearTimeout(bounceTimer)
+  if (bubbleTimer !== null) clearTimeout(bubbleTimer)
+  if (blinkTimer !== null) clearInterval(blinkTimer)
+  bounceTimer = null
+  bubbleTimer = null
+  blinkTimer = null
+  isBlinking = false
 }

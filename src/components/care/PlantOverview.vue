@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Plant } from '../../lib/database'
-import { FULL_FORM_THRESHOLD } from '../../lib/database'
+import { getGrowthProgress, getGrowthStage, FULL_GROWTH_DAYS } from '../../lib/growth'
+import { getSpeciesFrame, hasGrowthArt } from '../../lib/speciesArt'
 import type { SpeciesCardItem } from '../../lib/speciesRegistry'
 import AppIcon from '../common/AppIcon.vue'
 
@@ -9,7 +10,8 @@ const props = defineProps<{
   plant: Plant
   species?: SpeciesCardItem
   stageName: string
-  completedCount: number
+  growthDays: number
+  hasInteractedToday: boolean
   balance: number
   todayEarned: number
   streakCurrent: number
@@ -17,10 +19,14 @@ const props = defineProps<{
 const adoptedDays = computed(() =>
   Math.max(1, Math.floor((Date.now() - props.plant.adopted_at) / 86400000) + 1),
 )
-const growthCount = computed(() => Math.min(props.completedCount, FULL_FORM_THRESHOLD))
-const growthPercent = computed(() =>
-  Math.min(100, Math.round((props.completedCount / FULL_FORM_THRESHOLD) * 100)),
+const progress = computed(() => getGrowthProgress(props.growthDays))
+const stage = computed(() => getGrowthStage(props.growthDays))
+const previewUrl = computed(
+  () =>
+    getSpeciesFrame(props.plant.species_code, 'idle', stage.value.code) ??
+    props.species?.previewUrl,
 )
+const hasStageArt = computed(() => hasGrowthArt(props.plant.species_code))
 const stats = computed(() => [
   { icon: 'leaf', label: '累计积分', value: props.balance, unit: '' },
   { icon: 'chart', label: '今日获得', value: props.todayEarned, unit: '/ 20' },
@@ -33,9 +39,9 @@ const stats = computed(() => [
       <div class="plant-art">
         <span class="art-orbit" aria-hidden="true" />
         <img
-          v-if="species?.previewUrl"
-          :src="species.previewUrl"
-          :alt="species.name"
+          v-if="previewUrl"
+          :src="previewUrl"
+          :alt="`${species?.name ?? '植物'}·${stageName}`"
           draggable="false"
         />
         <span v-else class="plant-placeholder">{{ species?.emoji || '🌱' }}</span>
@@ -51,19 +57,29 @@ const stats = computed(() => [
         </p>
         <div class="growth-block">
           <div class="growth-caption">
-            <span>{{ growthPercent === 100 ? '已长成完全体' : '下一次成长' }}</span
+            <span>{{
+              growthDays >= FULL_GROWTH_DAYS
+                ? '已长成完全体'
+                : `再 ${progress.remaining} 日进入${stage.code === 'juvenile' ? '成年体' : '完全体'}`
+            }}</span
             ><span
-              ><strong>{{ growthCount }}</strong> / {{ FULL_FORM_THRESHOLD }} 次养护</span
+              ><strong>{{ growthDays }}</strong
+              ><template v-if="growthDays < FULL_GROWTH_DAYS"> / {{ progress.target }}</template>
+              有效养育日</span
             >
           </div>
           <el-progress
-            :percentage="growthPercent"
+            :percentage="progress.percent"
             :stroke-width="7"
             :show-text="false"
             color="#c87955"
           />
         </div>
-        <p class="plant-tip">去桌面摸摸它，或点 💧 / ☀️ 完成养护</p>
+        <p class="companionship-status" :class="{ 'is-recorded': hasInteractedToday }">
+          {{ hasInteractedToday ? '今日已陪伴 · 成长已记录' : '今日待陪伴 · 去桌宠上摸摸它吧' }}
+        </p>
+        <p class="plant-tip">每天首次摸摸、浇水或光照自动累计成长；漏做不扣进度。</p>
+        <p v-if="!hasStageArt" class="plant-tip">阶段素材待补齐，暂用原有形象；成长会正常记录。</p>
       </div>
     </div>
     <div class="plant-stats">
@@ -192,6 +208,15 @@ const stats = computed(() => [
   color: var(--sprout-muted);
   font-size: 11px;
   line-height: 1.7;
+}
+.companionship-status {
+  margin: 14px 0 0;
+  color: var(--sprout-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.companionship-status.is-recorded {
+  color: #52754e;
 }
 .plant-stats {
   display: grid;

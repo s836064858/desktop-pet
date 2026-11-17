@@ -11,33 +11,153 @@ const WHITE_TOL = 20
 
 const MAP = [
   // 绿萝
-  { dir: '绿萝', file: '52design-free-creation-free-media-ca0ad4d88b434874b9e03fb109e2c3d9-1792645960139.png', species: 'pothos', name: 'idle1' },
-  { dir: '绿萝', file: '52design-free-creation-free-media-f5547a7fb9124bc5a70a05f4c4ac91ef-1792645967294.png', species: 'pothos', name: 'happy1' },
-  { dir: '绿萝', file: '52design-free-creation-free-media-5887c6bcaf2d498289ea61a4d34cdac9-1792645961895.png', species: 'pothos', name: 'thirsty1' },
-  { dir: '绿萝', file: '52design-free-creation-free-media-39b54a0ffb9f4ca0928059d062d3c61d-1792645963512.png', species: 'pothos', name: 'water1' },
-  { dir: '绿萝', file: '52design-free-creation-free-media-4e214c6d104a4b7e9dafdcf2ada3d9f3-1792645968994.png', species: 'pothos', name: 'sun1' },
-  { dir: '绿萝', file: '52design-free-creation-free-media-c8409ced5bcf4b4db9089c0240ef1fb2-1792645965411.png', species: 'pothos', name: 'sleep1' },
+  {
+    dir: '绿萝',
+    file: '52design-free-creation-free-media-ca0ad4d88b434874b9e03fb109e2c3d9-1792645960139.png',
+    species: 'pothos',
+    name: 'idle1',
+  },
+  {
+    dir: '绿萝',
+    file: '52design-free-creation-free-media-f5547a7fb9124bc5a70a05f4c4ac91ef-1792645967294.png',
+    species: 'pothos',
+    name: 'happy1',
+  },
+  {
+    dir: '绿萝',
+    file: '52design-free-creation-free-media-5887c6bcaf2d498289ea61a4d34cdac9-1792645961895.png',
+    species: 'pothos',
+    name: 'thirsty1',
+  },
+  {
+    dir: '绿萝',
+    file: '52design-free-creation-free-media-39b54a0ffb9f4ca0928059d062d3c61d-1792645963512.png',
+    species: 'pothos',
+    name: 'water1',
+  },
+  {
+    dir: '绿萝',
+    file: '52design-free-creation-free-media-4e214c6d104a4b7e9dafdcf2ada3d9f3-1792645968994.png',
+    species: 'pothos',
+    name: 'sun1',
+  },
+  {
+    dir: '绿萝',
+    file: '52design-free-creation-free-media-c8409ced5bcf4b4db9089c0240ef1fb2-1792645965411.png',
+    species: 'pothos',
+    name: 'sleep1',
+  },
   // 龟背竹
-  { dir: '龟背竹', file: '52design-free-creation-free-media-417cdc0f501d458081e9931db8f9ec21-1792646947347.png', species: 'monstera', name: 'idle1' },
-  { dir: '龟背竹', file: '52design-free-creation-free-media-6074ffffdcbc45ce9805ddaed1c2280e-1792646941831.png', species: 'monstera', name: 'happy1' },
-  { dir: '龟背竹', file: '52design-free-creation-free-media-89c6f3ee713443f39b97fa3625ff506b-1792646945264.png', species: 'monstera', name: 'thirsty1' },
-  { dir: '龟背竹', file: '52design-free-creation-free-media-09fe6b3225ea46e4bad6ed094ecfbd78-1792646949464.png', species: 'monstera', name: 'water1' },
-  { dir: '龟背竹', file: '52design-free-creation-free-media-1e62b07e38734c5cb20260d12d901139-1792646943464.png', species: 'monstera', name: 'sun1' },
-  { dir: '龟背竹', file: '52design-free-creation-free-media-bf3a9068b4434243ad473791e2d8d67b-1792646940397.png', species: 'monstera', name: 'sleep1' },
+  {
+    dir: '龟背竹',
+    file: '52design-free-creation-free-media-417cdc0f501d458081e9931db8f9ec21-1792646947347.png',
+    species: 'monstera',
+    name: 'idle1',
+  },
+  {
+    dir: '龟背竹',
+    file: '52design-free-creation-free-media-6074ffffdcbc45ce9805ddaed1c2280e-1792646941831.png',
+    species: 'monstera',
+    name: 'happy1',
+  },
+  {
+    dir: '龟背竹',
+    file: '52design-free-creation-free-media-89c6f3ee713443f39b97fa3625ff506b-1792646945264.png',
+    species: 'monstera',
+    name: 'thirsty1',
+  },
+  {
+    dir: '龟背竹',
+    file: '52design-free-creation-free-media-09fe6b3225ea46e4bad6ed094ecfbd78-1792646949464.png',
+    species: 'monstera',
+    name: 'water1',
+  },
+  {
+    dir: '龟背竹',
+    file: '52design-free-creation-free-media-1e62b07e38734c5cb20260d12d901139-1792646943464.png',
+    species: 'monstera',
+    name: 'sun1',
+  },
+  {
+    dir: '龟背竹',
+    file: '52design-free-creation-free-media-bf3a9068b4434243ad473791e2d8d67b-1792646940397.png',
+    species: 'monstera',
+    name: 'sleep1',
+  },
   // 多肉
-  { dir: '多肉', file: '52design-free-creation-free-media-476d7e5abf5d45b889462e8d0612bb11-1792647108831.png', species: 'succulent', name: 'idle1' },
-  { dir: '多肉', file: '52design-free-creation-free-media-328bac04b23c4353a73620c47dcfd263-1792647112515.png', species: 'succulent', name: 'happy1' },
-  { dir: '多肉', file: '52design-free-creation-free-media-cd345ffe00e4486a8d1ecb8f4611c133-1792647115499.png', species: 'succulent', name: 'thirsty1' },
-  { dir: '多肉', file: '52design-free-creation-free-media-dd41525ee91c41d09b04ce9a7e8612d6-1792647106765.png', species: 'succulent', name: 'water1' },
-  { dir: '多肉', file: '52design-free-creation-free-media-f1df1b38ccda49b6bfa7aa94599807aa-1792647110415.png', species: 'succulent', name: 'sun1' },
-  { dir: '多肉', file: '52design-free-creation-free-media-2f779d3fcc53431a84f3ebf0328bf46d-1792647114015.png', species: 'succulent', name: 'sleep1' },
+  {
+    dir: '多肉',
+    file: '52design-free-creation-free-media-476d7e5abf5d45b889462e8d0612bb11-1792647108831.png',
+    species: 'succulent',
+    name: 'idle1',
+  },
+  {
+    dir: '多肉',
+    file: '52design-free-creation-free-media-328bac04b23c4353a73620c47dcfd263-1792647112515.png',
+    species: 'succulent',
+    name: 'happy1',
+  },
+  {
+    dir: '多肉',
+    file: '52design-free-creation-free-media-cd345ffe00e4486a8d1ecb8f4611c133-1792647115499.png',
+    species: 'succulent',
+    name: 'thirsty1',
+  },
+  {
+    dir: '多肉',
+    file: '52design-free-creation-free-media-dd41525ee91c41d09b04ce9a7e8612d6-1792647106765.png',
+    species: 'succulent',
+    name: 'water1',
+  },
+  {
+    dir: '多肉',
+    file: '52design-free-creation-free-media-f1df1b38ccda49b6bfa7aa94599807aa-1792647110415.png',
+    species: 'succulent',
+    name: 'sun1',
+  },
+  {
+    dir: '多肉',
+    file: '52design-free-creation-free-media-2f779d3fcc53431a84f3ebf0328bf46d-1792647114015.png',
+    species: 'succulent',
+    name: 'sleep1',
+  },
   // 仙人球
-  { dir: '仙人球', file: '52design-free-creation-free-media-2bbdbf2dfd5446449478b205272544e7-1792647299000.png', species: 'cactus', name: 'idle1' },
-  { dir: '仙人球', file: '52design-free-creation-free-media-b828d654baed41a795284ebc8db22921-1792647297048.png', species: 'cactus', name: 'happy1' },
-  { dir: '仙人球', file: '52design-free-creation-free-media-39513b0652644eb9930e180a717f6bc1-1792647295399.png', species: 'cactus', name: 'thirsty1' },
-  { dir: '仙人球', file: '52design-free-creation-free-media-0d19d6c4d40642baadf9a8e6ea1c6e51-1792647301766.png', species: 'cactus', name: 'water1' },
-  { dir: '仙人球', file: '52design-free-creation-free-media-5d4e1e4abb304863806ed26b200c4be4-1792647307082.png', species: 'cactus', name: 'sun1' },
-  { dir: '仙人球', file: '52design-free-creation-free-media-eada6f193d9349bc9d4f46718a462593-1792647314250.png', species: 'cactus', name: 'sleep1' },
+  {
+    dir: '仙人球',
+    file: '52design-free-creation-free-media-2bbdbf2dfd5446449478b205272544e7-1792647299000.png',
+    species: 'cactus',
+    name: 'idle1',
+  },
+  {
+    dir: '仙人球',
+    file: '52design-free-creation-free-media-b828d654baed41a795284ebc8db22921-1792647297048.png',
+    species: 'cactus',
+    name: 'happy1',
+  },
+  {
+    dir: '仙人球',
+    file: '52design-free-creation-free-media-39513b0652644eb9930e180a717f6bc1-1792647295399.png',
+    species: 'cactus',
+    name: 'thirsty1',
+  },
+  {
+    dir: '仙人球',
+    file: '52design-free-creation-free-media-0d19d6c4d40642baadf9a8e6ea1c6e51-1792647301766.png',
+    species: 'cactus',
+    name: 'water1',
+  },
+  {
+    dir: '仙人球',
+    file: '52design-free-creation-free-media-5d4e1e4abb304863806ed26b200c4be4-1792647307082.png',
+    species: 'cactus',
+    name: 'sun1',
+  },
+  {
+    dir: '仙人球',
+    file: '52design-free-creation-free-media-eada6f193d9349bc9d4f46718a462593-1792647314250.png',
+    species: 'cactus',
+    name: 'sleep1',
+  },
 ]
 
 // 合并各物种 assets-src/{dir}/map.json（由 scripts/sprite-studio.mjs commit 生成；设计见 docs/生图自动化脚本设计.md §6）
@@ -177,7 +297,9 @@ function decodePng(buffer) {
 }
 
 function isNearWhite(rgba, i) {
-  return rgba[i] >= 255 - WHITE_TOL && rgba[i + 1] >= 255 - WHITE_TOL && rgba[i + 2] >= 255 - WHITE_TOL
+  return (
+    rgba[i] >= 255 - WHITE_TOL && rgba[i + 1] >= 255 - WHITE_TOL && rgba[i + 2] >= 255 - WHITE_TOL
+  )
 }
 
 function removeWhiteBackground(rgba, width, height) {
@@ -225,8 +347,10 @@ function featherEdges(rgba, width, height) {
       }
       const p = index * 4
       const neighbours = [
-        alphaCopy[index - 1], alphaCopy[index + 1],
-        alphaCopy[index - width], alphaCopy[index + width],
+        alphaCopy[index - 1],
+        alphaCopy[index + 1],
+        alphaCopy[index - width],
+        alphaCopy[index + width],
       ]
       const transparentNeighbours = neighbours.filter((a) => a === 0).length
       if (transparentNeighbours >= 2 && rgba[p] > 200 && rgba[p + 1] > 200 && rgba[p + 2] > 200) {
@@ -249,8 +373,10 @@ function resizeBilinear(rgba, width, height, target) {
       const x1 = Math.min(width - 1, x0 + 1)
       const fx = sx - x0
       for (let c = 0; c < 4; c++) {
-        const top = rgba[(y0 * width + x0) * 4 + c] * (1 - fx) + rgba[(y0 * width + x1) * 4 + c] * fx
-        const bottom = rgba[(y1 * width + x0) * 4 + c] * (1 - fx) + rgba[(y1 * width + x1) * 4 + c] * fx
+        const top =
+          rgba[(y0 * width + x0) * 4 + c] * (1 - fx) + rgba[(y0 * width + x1) * 4 + c] * fx
+        const bottom =
+          rgba[(y1 * width + x0) * 4 + c] * (1 - fx) + rgba[(y1 * width + x1) * 4 + c] * fx
         out[(y * target + x) * 4 + c] = Math.round(top * (1 - fy) + bottom * fy)
       }
     }
@@ -259,9 +385,71 @@ function resizeBilinear(rgba, width, height, target) {
 }
 
 // 支持按物种过滤：既有物种 stage0 里有手工改名修正的帧（见 AGENTS.md 已知坑），全量重切会覆盖掉修正
-const ONLY = process.argv.slice(2)
+const HAS_GROWTH_ONLY = process.argv.includes('--growth-only')
+const ONLY = process.argv.slice(2).filter((arg) => !arg.startsWith('--'))
+
+function normalizeGrowthSprite({ rgba, width, height, anchor, targetPotWidth }) {
+  const output = Buffer.alloc(TARGET * TARGET * 4)
+  const scale = targetPotWidth / anchor.potWidth
+  for (let y = 0; y < TARGET; y++) {
+    for (let x = 0; x < TARGET; x++) {
+      const sx = (x - TARGET / 2) / scale + anchor.centerX
+      const sy = (y - (TARGET - 20)) / scale + anchor.footY
+      if (sx < 0 || sy < 0 || sx >= width - 1 || sy >= height - 1) continue
+      const x0 = Math.floor(sx)
+      const y0 = Math.floor(sy)
+      const fx = sx - x0
+      const fy = sy - y0
+      const pixels = [
+        [x0, y0, (1 - fx) * (1 - fy)],
+        [x0 + 1, y0, fx * (1 - fy)],
+        [x0, y0 + 1, (1 - fx) * fy],
+        [x0 + 1, y0 + 1, fx * fy],
+      ]
+      const colour = [0, 0, 0]
+      let alpha = 0
+      for (const [px, py, weight] of pixels) {
+        const offset = (py * width + px) * 4
+        const coverage = rgba[offset + 3] * weight
+        alpha += coverage
+        for (let channel = 0; channel < 3; channel++)
+          colour[channel] += rgba[offset + channel] * coverage
+      }
+      const offset = (y * TARGET + x) * 4
+      output[offset + 3] = Math.round(alpha)
+      if (alpha > 0)
+        for (let channel = 0; channel < 3; channel++)
+          output[offset + channel] = Math.round(colour[channel] / alpha)
+    }
+  }
+  return output
+}
+
+function processGrowthSprites() {
+  const map = JSON.parse(readFileSync(resolve(ROOT, 'scripts/growth-sprites.json'), 'utf8'))
+  if (ONLY.length && !ONLY.includes(map.species)) return
+  for (const { stage, name, file, anchor } of map.frames) {
+    if (!['juvenile', 'adult', 'full'].includes(stage) || !/^[a-z]+\d+$/.test(name))
+      throw new Error('阶段素材映射不合法')
+    const { width, height, rgba } = decodePng(readFileSync(resolve(SRC_DIR, file)))
+    const output = normalizeGrowthSprite({
+      rgba,
+      width,
+      height,
+      anchor,
+      targetPotWidth: map.targetPotWidth,
+    })
+    const outDir = resolve(OUT_DIR, map.species, stage)
+    mkdirSync(outDir, { recursive: true })
+    writeFileSync(resolve(outDir, `${name}.png`), encodePng(output, TARGET, TARGET))
+    console.log(`${map.species}/${stage}/${name}.png`)
+  }
+}
+
+if (HAS_GROWTH_ONLY) processGrowthSprites()
 
 for (const { dir, file, species, name } of MAP) {
+  if (HAS_GROWTH_ONLY) continue
   if (ONLY.length && !ONLY.includes(species)) continue
   const { width, height, rgba } = decodePng(readFileSync(resolve(SRC_DIR, dir, file)))
   removeWhiteBackground(rgba, width, height)

@@ -1,4 +1,5 @@
 import type { FrameName } from '../../../lib/speciesArt'
+import type { CareProfile } from '../../../lib/careProfile'
 
 export type ForgeStep = 'compose' | 'generate' | 'gallery'
 export type FrameStatus = 'pending' | 'running' | 'done' | 'error'
@@ -8,13 +9,14 @@ export interface ForgeForm {
   emoji: string
   desc: string
   states: Record<FrameName, string>
+  careProfile: CareProfile
 }
 export const FRAME_META: Record<FrameName, { label: string; icon: string }> = {
   idle: { label: '基础形象', icon: 'leaf' },
   happy: { label: '开心', icon: 'smile' },
   thirsty: { label: '缺水', icon: 'water' },
   water: { label: '浇水', icon: 'water' },
-  sun: { label: '晒太阳', icon: 'sun' },
+  sun: { label: '光照舒适', icon: 'sun' },
   sleep: { label: '熟睡', icon: 'moon' },
 }
 export const FRAME_STATUS_LABELS: Record<FrameStatus, string> = {

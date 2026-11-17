@@ -17,6 +17,7 @@ import type { FrameName } from '../lib/speciesArt'
 import type { ForgeForm, ForgeStep, FrameStatus } from '../components/care/forge/types'
 import { FRAME_META } from '../components/care/forge/types'
 import styleRefUrl from '../assets/sprite-ref/style-ref.png'
+import { createCareProfile, validateCareProfile } from '../lib/careProfile'
 
 function createForm(): ForgeForm {
   return {
@@ -25,13 +26,13 @@ function createForm(): ForgeForm {
     emoji: '🌱',
     desc: '',
     states: Object.fromEntries(FRAME_KEYS.map((frame) => [frame, ''])) as Record<FrameName, string>,
+    careProfile: createCareProfile(),
   }
 }
 
 // 错误码对照：https://console.volcengine.com/ark/region:cn-beijing/docs/error-codes
 // 分类只认方舟 code 与 HTTP 状态，指引之外保留模型原始 message（截断），完整错误打 console
 function operationError(error: unknown): string {
-  console.error('[物种工坊] 操作失败：', error)
   const raw = (error instanceof Error ? error.message : String(error)).trim()
   if (!raw) return '操作未完成，请稍后重试，已完成的图片会保留。'
   const guide = errorGuide(raw)
@@ -40,22 +41,23 @@ function operationError(error: unknown): string {
 }
 
 function errorGuide(message: string): string {
-  if (/401|403|鉴权|AuthenticationFailed|InvalidAccessToken|ExpiredAccessToken|AccessDenied/.test(message))
+  if (
+    /401|403|鉴权|AuthenticationFailed|InvalidAccessToken|ExpiredAccessToken|AccessDenied/.test(
+      message,
+    )
+  )
     return '密钥验证失败，请在上方检查 AI 素材密钥。'
   if (/DataInspectionFailed|SensitiveContentDetected|内容审核|敏感/.test(message))
     return '内容未通过平台安全审核，请调整植物外形或状态描述后重试。'
   if (/ModelNotOpen|InvalidEndpointOrModel|OpenServiceRejected|未开通/.test(message))
     return '方舟模型尚未开通，请按上方教程在控制台「开通管理」中开通所需模型。'
-  if (/429|FlowLimit|ReqThrottle|Quota/.test(message))
-    return '请求较多或配额不足，请稍后再试。'
+  if (/429|FlowLimit|ReqThrottle|Quota/.test(message)) return '请求较多或配额不足，请稍后再试。'
   if (/InvalidParameter|参数/.test(message))
     return '请求参数未通过，通常与提示词有关，请调整描述后重试。'
   if (/HTTP 5\d\d|InternalServiceError|ServiceUnavailable/.test(message))
     return '生成服务暂时不可用，请稍后重试，已完成的图片会保留。'
-  if (/timeout|超时|abort/i.test(message))
-    return '请求超时，请稍后重试，已完成的图片会保留。'
-  if (/网络|fetch|network/i.test(message))
-    return '网络连接失败，请检查网络后重试。'
+  if (/timeout|超时|abort/i.test(message)) return '请求超时，请稍后重试，已完成的图片会保留。'
+  if (/网络|fetch|network/i.test(message)) return '网络连接失败，请检查网络后重试。'
   return ''
 }
 
@@ -122,7 +124,12 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
     if (builtinSpeciesCodes().has(form.code)) return '物种标识已被内置植物使用，请换一个。'
     if (!form.name.trim() || !form.desc.trim()) return '请填写植物名称和外形描述。'
     if (FRAME_KEYS.some((frame) => !form.states[frame].trim())) return '请补齐六种状态描述。'
-    return ''
+    try {
+      validateCareProfile(form.careProfile)
+      return ''
+    } catch (cause) {
+      return cause instanceof Error ? cause.message : '请补齐养护习性。'
+    }
   }
 
   async function isCodeAvailable(): Promise<boolean> {
@@ -146,7 +153,7 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
     try {
       const key = await ensureApiKey()
       if (!isActive) return
-      const draft = await draftSpecies(key, phrase.value.trim())
+      const draft = await draftSpecies(key, phrase.value.trim(), localController.signal)
       if (!isActive) return
       applyDraft(draft)
     } catch (error) {
@@ -168,6 +175,7 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
       emoji: draft.emoji,
       desc: draft.desc,
       states: { ...draft.states },
+      careProfile: { ...draft.careProfile },
     })
     hasDraft.value = true
   }
@@ -196,7 +204,12 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
         frame === 'idle'
           ? buildIdlePrompt(form.desc.trim())
           : buildDerivedPrompt(form.desc.trim(), frame, form.states[frame].trim())
-      const bytes = await generateFramePng({ apiKey, prompt, refPngBytes })
+      const bytes = await generateFramePng({
+        apiKey,
+        prompt,
+        refPngBytes,
+        signal: localController.signal,
+      })
       if (!isActive) return
       const preview = await processSpritePng(bytes)
       if (!isActive) return
@@ -300,6 +313,7 @@ export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
       emoji: form.emoji.trim() || '🌱',
       desc: form.desc.trim(),
       states: { ...form.states },
+      careProfile: validateCareProfile(form.careProfile),
     }
   }
 

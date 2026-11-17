@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { emit, listen } from '@tauri-apps/api/event'
 import { ElMessage } from 'element-plus'
 import {
@@ -7,27 +7,26 @@ import {
   ensureSchema,
   getPlant,
   getPointsBalance,
-  getStageFromCount,
   getStreak,
   getTodayPointsSum,
-  getTotalCompletedCount,
   listOpenTasks,
   resetPlant,
-  snoozeTask,
 } from '../lib/database'
 import type { CareTask, Plant, PlantAdoptInput } from '../lib/database'
+import { emptyGrowthSnapshot, getGrowthSnapshot } from '../lib/growthRepository'
+import { getGrowthStage } from '../lib/growth'
 
 async function readSnapshot() {
   await ensureSchema()
   const nextPlant = await getPlant()
-  const [nextTasks, nextBalance, nextToday, nextStreak, nextCount] = await Promise.all([
+  const [nextTasks, nextBalance, nextToday, nextStreak, nextGrowth] = await Promise.all([
     nextPlant ? listOpenTasks(nextPlant.id) : Promise.resolve([]),
     getPointsBalance(),
     getTodayPointsSum(),
     getStreak(),
-    getTotalCompletedCount(),
+    nextPlant ? getGrowthSnapshot(nextPlant.id) : Promise.resolve(emptyGrowthSnapshot()),
   ])
-  return { nextPlant, nextTasks, nextBalance, nextToday, nextStreak, nextCount }
+  return { nextPlant, nextTasks, nextBalance, nextToday, nextStreak, nextGrowth }
 }
 
 export const useCareStore = defineStore('care', () => {
@@ -35,11 +34,12 @@ export const useCareStore = defineStore('care', () => {
   const balance = ref(0)
   const todayEarned = ref(0)
   const plant = ref<Plant | null>(null)
-  const stageName = ref('成熟期')
-  const completedCount = ref(0)
+  const growth = ref(emptyGrowthSnapshot())
+  const displayGrowthDays = computed(() => growth.value.previewDays ?? growth.value.days)
+  const stage = computed(() => getGrowthStage(displayGrowthDays.value))
+  const stageName = computed(() => stage.value.name)
   const loadError = ref('')
   const streakCurrent = ref(0)
-  const isSnoozing = ref(false)
   const isLoaded = ref(false)
   let unlisten: (() => void) | null = null
   let refreshVersion = 0
@@ -62,44 +62,32 @@ export const useCareStore = defineStore('care', () => {
     balance.value = snapshot.nextBalance
     todayEarned.value = snapshot.nextToday
     streakCurrent.value = snapshot.nextStreak.currentCount
-    completedCount.value = snapshot.nextCount
-    stageName.value = getStageFromCount(snapshot.nextCount).name
+    growth.value = snapshot.nextGrowth
     loadError.value = ''
     isLoaded.value = true
   }
 
   async function adopt(input: PlantAdoptInput): Promise<void> {
-    plant.value = await createPlant(input)
-    tasks.value = []
-    await emit('plant-changed')
-    await emit('care-changed')
+    refreshVersion += 1
+    try {
+      await createPlant(input)
+    } finally {
+      await refresh()
+      await emit('plant-changed')
+      await emit('care-changed')
+    }
     ElMessage.success(`领养成功，${input.nickname} 已搬到桌面！`)
   }
 
   async function resetAdopted(): Promise<void> {
+    refreshVersion += 1
     await resetPlant()
+    refreshVersion += 1
     plant.value = null
     tasks.value = []
+    growth.value = emptyGrowthSnapshot()
     await emit('plant-changed')
     await emit('care-changed')
-  }
-
-  async function handleSnooze(taskId: number): Promise<void> {
-    if (isSnoozing.value) {
-      return
-    }
-    isSnoozing.value = true
-    try {
-      const isOk = await snoozeTask(taskId)
-      if (!isOk) {
-        ElMessage.warning('已经推迟 3 次啦，不能再拖了')
-      }
-      await refresh()
-    } catch (err) {
-      ElMessage.error(`推迟失败：${String(err)}`)
-    } finally {
-      isSnoozing.value = false
-    }
   }
 
   async function init(): Promise<void> {
@@ -135,15 +123,15 @@ export const useCareStore = defineStore('care', () => {
     todayEarned,
     plant,
     stageName,
-    completedCount,
+    displayGrowthDays,
+    growth,
+    stage,
     loadError,
     streakCurrent,
-    isSnoozing,
     isLoaded,
     refresh,
     adopt,
     resetAdopted,
-    handleSnooze,
     init,
     dispose,
   }
