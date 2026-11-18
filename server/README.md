@@ -1,5 +1,7 @@
 # 芽伴 AI 服务与管理后台
 
+线上服务从 GitHub 拉取和更新的步骤见 [Docker 部署手册](DEPLOYMENT.md)。
+
 ## 本地运行
 
 1. 使用 Node 22 和 pnpm。桌面根目录、`server/`、`admin/` 分别安装锁定依赖。
@@ -10,7 +12,7 @@
 
 | 文件 | 配置 | 消费方 |
 | --- | --- | --- |
-| 根目录 `.env` | `VITE_AI_API_ORIGIN` 默认 `http://127.0.0.1:3000`；只填 Origin，不填 API 路径 | 桌面 Vite 在构建时追加 `/api/v1/ai`，不读取脚本密钥作为应用配置 |
+| 根目录 `.env` | `VITE_AI_API_ORIGIN` 用于桌面开发环境，默认 `http://127.0.0.1:3000`。`VITE_AI_PRODUCTION_API_ORIGIN` 用于生产构建，默认 `https://sproutkin.raozi666.xyz`。两项均只填 Origin | 桌面 Vite 追加 `/api/v1/ai`，应用配置只读取对应的 Origin |
 | `admin/.env` | `ADMIN_PORT` 默认 `5180`，`SERVER_PORT` 默认 `3000` | 后台 Vite 开发与预览服务器，不注入浏览器 |
 | `server/.env` | `SERVER_PORT` 默认 `3000`，`ADMIN_ORIGIN` 默认 `http://127.0.0.1:5180`；另配 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 和 `CONFIG_ENCRYPTION_KEY`（32 随机字节的十六进制字符串） | 服务端启动、数据库脚本、后台会话与凭证加密 |
 
