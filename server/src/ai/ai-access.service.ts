@@ -28,6 +28,7 @@ interface InviteListRow extends RowDataPacket {
   nickname: string | null
   isAiDisabled: number | null
   codeCipher: Buffer | null
+  expiresAt: Date | null
 }
 
 const inviteFields = `id, label, user_id AS userId, expires_at AS expiresAt,
@@ -67,7 +68,8 @@ export class AiAccessService {
 
   async list(canReadCodes: boolean) {
     const rows = await this.database.execute<InviteListRow[]>(`SELECT invite.id, invite.label, invite.user_id AS userId,
-      invite.created_at AS createdAt, invite.expires_at AS expiresAt, invite.redeemed_at AS redeemedAt,
+      invite.created_at AS createdAt, invite.redeemed_at AS redeemedAt,
+      CASE WHEN invite.redeemed_at IS NULL THEN invite.expires_at ELSE NULL END AS expiresAt,
       invite.revoked_at AS revokedAt, identity.label AS nickname, identity.is_ai_disabled AS isAiDisabled,
       identity.revoked_at AS userRevokedAt, ${canReadCodes ? 'invite.code_cipher' : 'NULL'} AS codeCipher
       FROM ai_invites AS invite LEFT JOIN ai_users AS identity ON identity.id = invite.user_id

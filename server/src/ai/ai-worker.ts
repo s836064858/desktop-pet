@@ -12,7 +12,23 @@ import { AiSettingsService } from './ai-settings.service'
 import { ArkError, CHAT_MODEL, IMAGE_MODEL, arkImage, arkRequest, arkText, arkUsage } from './ark-provider'
 import type { ArkUsage } from './ark-provider'
 
-interface ClaimedJob extends JobRow { credentials: Buffer | null; hasImage: number }
+interface QueuedJob extends JobRow {
+  hasImage: number
+  queueMs: number
+}
+
+interface ClaimedJob extends QueuedJob {
+  credentials: Buffer | null
+}
+
+interface ActiveJob {
+  draftId: string
+  completion: Promise<void>
+}
+
+function excludeActive(column: 'id' | 'job_id' | 'draft_id', ids: string[]): string {
+  return ids.length ? ` AND ${column} NOT IN (${ids.map(() => '?').join(', ')})` : ''
+}
 
 function completeChat(state: DraftState, job: JobRow, text: string, errorMessage: string | null): void {
   const queued = state.messages.find((message) => message.id === job.operationId)
@@ -27,6 +43,7 @@ function completeChat(state: DraftState, job: JobRow, text: string, errorMessage
 export class AiWorker implements OnModuleInit, OnModuleDestroy {
   private readonly controller = new AbortController()
   private readonly logger = new Logger(AiWorker.name)
+  private readonly activeJobs = new Map<string, ActiveJob>()
   private loop?: Promise<void>
   private sweepAt = 0
 
@@ -37,45 +54,83 @@ export class AiWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    this.loop = this.run(this.controller.signal)
+    const setting = process.env.AI_WORKER_CONCURRENCY ?? '2'
+    if (!/^[1-4]$/.test(setting)) {
+      const message = 'AI_WORKER_CONCURRENCY 必须为 1 到 4 的整数。'
+      this.logger.error(message)
+      throw new Error(message)
+    }
+    const concurrency = Number(setting)
+    this.logger.log(`AI 任务并发上限：${concurrency}。`)
+    this.loop = this.run({ signal: this.controller.signal, concurrency })
   }
 
   async onModuleDestroy(): Promise<void> {
     this.controller.abort()
     await this.loop
+    await Promise.all(this.activeCompletions())
   }
 
-  private async run(signal: AbortSignal): Promise<void> {
+  private activeCompletions(): Promise<void>[] {
+    return Array.from(this.activeJobs.values(), ({ completion }) => completion)
+  }
+
+  private async run({ signal, concurrency }: { signal: AbortSignal; concurrency: number }): Promise<void> {
     while (!signal.aborted) {
-      try {
-        if (Date.now() >= this.sweepAt) {
-          this.sweepAt = Date.now() + 60_000
-          await this.sweep()
-        }
-        const job = await this.claim()
-        if (job) {
-          await this.process(job, signal)
-          continue
-        }
-      } catch {
-        this.logger.warn('AI 队列本轮未完成，将重新检查任务状态。')
+      if (this.activeJobs.size >= concurrency) {
+        await Promise.race(this.activeCompletions())
+        continue
       }
+      if (await this.dispatch(signal)) continue
       await delay(1000, undefined, { signal }).catch(() => undefined)
+    }
+  }
+
+  private async dispatch(signal: AbortSignal): Promise<boolean> {
+    try {
+      if (Date.now() >= this.sweepAt) {
+        this.sweepAt = Date.now() + 60_000
+        await this.sweep()
+      }
+      if (signal.aborted) return false
+      const job = await this.claim()
+      if (!job) return false
+      const completion = this.runClaimedJob({ job, signal })
+      this.activeJobs.set(job.id, { draftId: job.draftId, completion })
+      return true
+    } catch {
+      this.logger.warn('AI 队列本轮未完成，将重新检查任务状态。')
+      return false
+    }
+  }
+
+  private async runClaimedJob({ job, signal }: { job: ClaimedJob; signal: AbortSignal }): Promise<void> {
+    try {
+      this.logger.log(`AI 任务开始 type=${job.type} queueMs=${Math.max(0, job.queueMs)}`)
+      await this.process(job, signal)
+    } catch {
+      this.logger.warn('AI 任务状态未能写回，将由队列检查处理。')
+    } finally {
+      this.activeJobs.delete(job.id)
     }
   }
 
   private async claim(): Promise<ClaimedJob | undefined> {
     return this.database.transaction(async (connection) => {
-      const [[job]] = await connection.execute<ClaimedJob[]>(`SELECT ${jobFields}, image_blob IS NOT NULL AS hasImage
+      const [[job]] = await connection.execute<QueuedJob[]>(`SELECT ${jobFields}, image_blob IS NOT NULL AS hasImage,
+        TIMESTAMPDIFF(MICROSECOND, created_at, UTC_TIMESTAMP(3)) DIV 1000 AS queueMs
         FROM ai_jobs WHERE status = 'queued' AND EXISTS (SELECT 1 FROM ai_users
           WHERE id = ai_jobs.user_id AND revoked_at IS NULL AND (is_ai_disabled = 0 OR ai_jobs.image_blob IS NOT NULL))
         AND EXISTS (SELECT 1 FROM ai_drafts WHERE id = ai_jobs.draft_id AND expires_at > UTC_TIMESTAMP(3))
+        AND NOT EXISTS (SELECT 1 FROM ai_jobs AS active_job
+          WHERE active_job.draft_id = ai_jobs.draft_id AND active_job.status = 'running')
         AND (image_blob IS NOT NULL OR EXISTS (SELECT 1 FROM ai_settings
           WHERE id = 1 AND is_paused = 0 AND credentials IS NOT NULL)) ORDER BY created_at, id LIMIT 1`)
       if (!job) return
       const [[identity]] = await connection.execute<RowDataPacket[]>(`SELECT is_ai_disabled, revoked_at
         FROM ai_users WHERE id = ? LOCK IN SHARE MODE`, [job.userId])
       if (!identity || identity.revoked_at || (identity.is_ai_disabled && !job.hasImage)) return
+      if (!(await this.canClaimDraft({ connection, draftId: job.draftId }))) return
       const [[settings]] = await connection.execute<RowDataPacket[]>(`SELECT is_paused, credentials
         FROM ai_settings WHERE id = 1 LOCK IN SHARE MODE`)
       if (!settings || (!job.hasImage && (settings.is_paused || !settings.credentials))) return
@@ -84,6 +139,15 @@ export class AiWorker implements OnModuleInit, OnModuleDestroy {
       if (claimed.affectedRows !== 1) return
       return { ...job, credentials: settings.credentials as Buffer | null }
     })
+  }
+
+  private async canClaimDraft({ connection, draftId }: { connection: PoolConnection; draftId: string }): Promise<boolean> {
+    const [[draft]] = await connection.execute<RowDataPacket[]>(`SELECT id FROM ai_drafts
+      WHERE id = ? AND expires_at > UTC_TIMESTAMP(3) FOR UPDATE`, [draftId])
+    if (!draft) return false
+    const [[activeJob]] = await connection.execute<RowDataPacket[]>(`SELECT id FROM ai_jobs
+      WHERE draft_id = ? AND status = 'running' LIMIT 1 LOCK IN SHARE MODE`, [draftId])
+    return !activeJob
   }
 
   private async process(job: ClaimedJob, signal: AbortSignal): Promise<void> {
@@ -177,6 +241,9 @@ export class AiWorker implements OnModuleInit, OnModuleDestroy {
       return output
     } catch (error) {
       const kind = error instanceof ArkError ? error.result : 'unknown'
+      if (error instanceof ArkError && error.statusCode === 429) {
+        this.logger.warn(`方舟触发限流 status=429 type=${job.type}`)
+      }
       await this.database.withConnection((connection) => this.completeUsage(connection, job.id, kind, used))
       throw new ArkError(error instanceof ArkError ? error.message : '方舟结果未能确认，请检查档案后重试。', kind)
     }
@@ -208,16 +275,23 @@ export class AiWorker implements OnModuleInit, OnModuleDestroy {
     })
   }
 
-  private async sweep(): Promise<void> {
+  private async recoverInterruptedJobs(jobIds: string[]): Promise<void> {
     await this.database.execute(`UPDATE ai_jobs SET status = IF(image_blob IS NULL, 'unknown', 'failed'),
       error_message = IF(image_blob IS NULL, '处理进程中断，结果未知。', '处理进程中断，可以重试上传原图。'),
-      payload = NULL, finished_at = UTC_TIMESTAMP(3) WHERE status = 'running' AND started_at < UTC_TIMESTAMP(3) - INTERVAL 5 MINUTE`)
+      payload = NULL, finished_at = UTC_TIMESTAMP(3) WHERE status = 'running'
+      AND started_at < UTC_TIMESTAMP(3) - INTERVAL 5 MINUTE${excludeActive('id', jobIds)}`, jobIds)
     await this.database.execute(`UPDATE ai_usage SET result = 'unknown', finished_at = UTC_TIMESTAMP(3)
-      WHERE result = 'running' AND started_at < UTC_TIMESTAMP(3) - INTERVAL 5 MINUTE`)
+      WHERE result = 'running' AND started_at < UTC_TIMESTAMP(3) - INTERVAL 5 MINUTE${excludeActive('job_id', jobIds)}`, jobIds)
+  }
+
+  private async sweep(): Promise<void> {
+    await this.recoverInterruptedJobs([...this.activeJobs.keys()])
+    const draftIds = Array.from(this.activeJobs.values(), ({ draftId }) => draftId)
     await this.database.execute(`UPDATE ai_jobs SET status = 'failed', payload = NULL, image_blob = NULL,
       finished_at = UTC_TIMESTAMP(3), error_message = '草稿已过期。' WHERE status = 'queued' AND NOT EXISTS
-      (SELECT 1 FROM ai_drafts WHERE id = ai_jobs.draft_id AND expires_at > UTC_TIMESTAMP(3))`)
-    await this.database.execute('DELETE FROM ai_drafts WHERE expires_at <= UTC_TIMESTAMP(3) LIMIT 100')
+      (SELECT 1 FROM ai_drafts WHERE id = ai_jobs.draft_id AND expires_at > UTC_TIMESTAMP(3))${excludeActive('draft_id', draftIds)}`, draftIds)
+    await this.database.execute(`DELETE FROM ai_drafts WHERE expires_at <= UTC_TIMESTAMP(3)
+      AND NOT EXISTS (SELECT 1 FROM ai_jobs WHERE draft_id = ai_drafts.id AND status = 'running') LIMIT 100`)
     await this.database.execute(`DELETE FROM ai_jobs WHERE finished_at <= UTC_TIMESTAMP(3) - ${retention} LIMIT 100`)
     await this.assets.sweep()
   }

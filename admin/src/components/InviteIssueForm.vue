@@ -41,8 +41,8 @@ function submit(): void {
         />
       </label>
       <label class="invite-field">
-        <span>有效期</span>
-        <ElSelect v-model="days" aria-label="有效期" class="ops-select" :disabled="isPending">
+        <span>兑换有效期</span>
+        <ElSelect v-model="days" aria-label="兑换有效期" class="ops-select" :disabled="isPending">
           <ElOption v-for="day in [1, 7, 14, 30]" :key="day" :value="day" :label="`${day} 天`" />
         </ElSelect>
       </label>

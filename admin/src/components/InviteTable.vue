@@ -29,7 +29,7 @@ function copyCodes(codes: string[]) {
 function state(invite: Invite) {
   if (invite.revokedAt) return '已撤销'
   if (invite.redeemedAt) return '已使用'
-  return Date.parse(invite.expiresAt) <= Date.now() ? '已过期' : '待使用'
+  return invite.expiresAt && Date.parse(invite.expiresAt) <= Date.now() ? '已过期' : '待使用'
 }
 
 function toggleUserAi(invite: Invite): void {
@@ -71,8 +71,8 @@ function toggleUserAi(invite: Invite): void {
         <span v-else>—</span>
       </template>
     </ElTableColumn>
-    <ElTableColumn label="到期时间" min-width="170">
-      <template #default="{ row }">{{ formatInviteDate(row.expiresAt) }}</template>
+    <ElTableColumn label="兑换截止" min-width="170">
+      <template #default="{ row }">{{ row.redeemedAt || !row.expiresAt ? '—' : formatInviteDate(row.expiresAt) }}</template>
     </ElTableColumn>
     <ElTableColumn label="备注" min-width="155">
       <template #default="{ row }">

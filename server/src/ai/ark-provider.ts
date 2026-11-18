@@ -4,7 +4,7 @@ const arkOrigin = 'https://ark.cn-beijing.volces.com/api/v3'
 const pngSignature = Buffer.from('89504e470d0a1a0a', 'hex')
 
 export class ArkError extends Error {
-  constructor(message: string, readonly result: 'failed' | 'unknown') {
+  constructor(message: string, readonly result: 'failed' | 'unknown', readonly statusCode?: number) {
     super(message)
   }
 }
@@ -75,7 +75,8 @@ export async function arkRequest(options: {
   }
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined)
-    throw new ArkError(`方舟请求未成功（HTTP ${response.status}）。`, response.status >= 500 ? 'unknown' : 'failed')
+    const statusCode = response.status
+    throw new ArkError(`方舟请求未成功（HTTP ${statusCode}）。`, statusCode >= 500 ? 'unknown' : 'failed', statusCode)
   }
   return readJson(response)
 }

@@ -9,7 +9,7 @@ export interface Invite {
   nickname: string | null
   isAiDisabled: boolean | null
   userRevokedAt: string | null
-  expiresAt: string
+  expiresAt: string | null
   redeemedAt: string | null
   revokedAt: string | null
 }

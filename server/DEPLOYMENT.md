@@ -53,6 +53,8 @@ docker compose --profile tunnel up -d --no-deps --force-recreate \
 
 公网请求由 Cloudflare Tunnel 进入 Caddy，Caddy 提供后台页面并将 `/api/` 转发给 NestJS。API 通过 Docker 内网访问独立 MySQL。
 
+单个 API 实例默认最多同时执行 2 条 AI 任务。可在 `config/server.env` 设置 `AI_WORKER_CONCURRENCY`（`1`–`4`），随后重启 `api` 容器。查看 `api` 日志中的 `queueMs` 和方舟 HTTP `429`，评估排队时间和限流情况。
+
 | 路径或资源 | 内容 |
 | --- | --- |
 | `/opt/sproutkin/compose.yaml` | 容器定义和当前版本挂载 |
