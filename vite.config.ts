@@ -9,12 +9,10 @@ const aiApiPath = '/api/v1/ai'
 
 function resolveAiApiBaseUrl(mode: string): string {
   const isProduction = mode === 'production'
-  const variable = isProduction ? 'VITE_AI_PRODUCTION_API_ORIGIN' : 'VITE_AI_API_ORIGIN'
-  const defaultOrigin = isProduction ? 'https://sproutkin.raozi666.xyz' : 'http://127.0.0.1:3000'
-  const value = loadEnv(mode, rootDirectory, variable)[variable] ?? defaultOrigin
-  const message = isProduction
-    ? `${variable} 必须为 HTTPS Origin，不能包含路径、参数或凭证。`
-    : `${variable} 必须为 HTTPS 或本机 HTTP Origin，不能包含路径、参数或凭证。`
+  const { VITE_AI_API_ORIGIN } = loadEnv(mode, rootDirectory, 'VITE_AI_API_ORIGIN')
+  const value = VITE_AI_API_ORIGIN ?? (isProduction ? '' : 'http://127.0.0.1:3000')
+  const originType = isProduction ? 'HTTPS' : 'HTTPS 或本机 HTTP'
+  const message = `VITE_AI_API_ORIGIN 必须为 ${originType} Origin，不能包含路径、参数或凭证。`
   if (!/^https?:\/\/[^\s/?#@\\]+\/?$/i.test(value)) throw new Error(message)
   const origin = URL.canParse(value) ? new URL(value) : null
   const canUseHttp = !isProduction && ['localhost', '127.0.0.1', '[::1]'].includes(origin?.hostname ?? '')
@@ -25,7 +23,7 @@ function resolveAiApiBaseUrl(mode: string): string {
   const allowed = aiCapability.permissions.some(({ identifier, allow }) =>
     identifier === 'http:default' && allow.some(({ url }) => url === `${baseUrl}/*`),
   )
-  if (!allowed) throw new Error(`${variable} 与 src-tauri/capabilities/ai-local.json 的 AI 白名单不一致。`)
+  if (!allowed) throw new Error('VITE_AI_API_ORIGIN 与 src-tauri/capabilities/ai-local.json 的 AI 白名单不一致。')
   return baseUrl
 }
 

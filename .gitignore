@@ -10,10 +10,11 @@ assets-src
 
 .DS_Store
 
-# 三端本地配置及 sprite-studio 密钥
+# 三端本地配置及 sprite-studio 密钥，根目录生产文件仅放公开配置
 .env
 .env.*
 !.env.example
+!/.env.production
 
 # 本地维护文档：保留本机文件，不纳入后续提交
 /docs/

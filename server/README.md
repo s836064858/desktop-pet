@@ -12,7 +12,7 @@
 
 | 文件 | 配置 | 消费方 |
 | --- | --- | --- |
-| 根目录 `.env` | `VITE_AI_API_ORIGIN` 用于桌面开发环境，默认 `http://127.0.0.1:3000`。`VITE_AI_PRODUCTION_API_ORIGIN` 用于生产构建，默认 `https://sproutkin.raozi666.xyz`。两项均只填 Origin | 桌面 Vite 追加 `/api/v1/ai`，应用配置只读取对应的 Origin |
+| 根目录 `.env` / `.env.production` | 两种模式均使用 `VITE_AI_API_ORIGIN`，只填 Origin。开发默认 `http://127.0.0.1:3000`，生产构建以 `.env.production` 中的 `https://sproutkin.raozi666.xyz` 为默认地址 | 桌面 Vite 追加 `/api/v1/ai`，应用配置只读取对应的 Origin |
 | `admin/.env` | `ADMIN_PORT` 默认 `5180`，`SERVER_PORT` 默认 `3000` | 后台 Vite 开发与预览服务器，不注入浏览器 |
 | `server/.env` | `SERVER_PORT` 默认 `3000`，`ADMIN_ORIGIN` 默认 `http://127.0.0.1:5180`；另配 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 和 `CONFIG_ENCRYPTION_KEY`（32 随机字节的十六进制字符串） | 服务端启动、数据库脚本、后台会话与凭证加密 |
 
