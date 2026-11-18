@@ -1,388 +1,397 @@
-import { computed, onUnmounted, reactive, shallowRef } from 'vue'
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { readSettings } from '../lib/capabilities'
-import { validateGrowthDescriptions } from '../lib/plantPlan'
-import type { PlantPlan } from '../lib/plantPlan'
-import type { CustomSpeciesMeta } from '../lib/spriteLibrary'
-import { getCustomSpecies, saveSpeciesToLibrary } from '../lib/spriteLibrary'
-import { FRAME_KEYS, GROWTH_STAGE_KEYS, GROWTH_STAGE_LABELS } from '../lib/spriteFrames'
-import type { FrameName, FrameTarget, GrowthFrames } from '../lib/spriteFrames'
+import { activateAi, aiClient, AiServiceError, aiWait } from '../lib/aiService'
+import { readAiToken, clearAiToken } from '../lib/aiDeviceVault'
+import type { AiDraft, AiJob, AiSlot } from '../lib/aiService'
 import type { GrowthStage } from '../lib/growth'
-import type { ForgeForm, ForgeStep } from '../components/care/forge/types'
-import { FRAME_META } from '../components/care/forge/types'
+import type { ChatProgress, ForgeStep } from '../components/care/forge/types'
+import { FRAME_KEYS, GROWTH_STAGE_KEYS } from '../lib/spriteFrames'
+import type { FrameName, FrameTarget } from '../lib/spriteFrames'
+import { validatePlantPlan } from '../lib/plantPlan'
+import type { PlantChatMessage } from '../lib/plantPlan'
+import { getCustomSpecies, saveSpeciesToLibrary } from '../lib/spriteLibrary'
+import { preparePlantReference } from '../lib/plantReference'
 import { useForgeFrames } from './useForgeFrames'
-import styleRefUrl from '../assets/sprite-ref/style-ref.png'
-import { createCareProfile, validateCareProfile } from '../lib/careProfile'
-import type { SpriteAnchor } from '../lib/spriteAlignment'
-import { usePlantReference } from './usePlantReference'
-import { usePlantPlanning } from './usePlantPlanning'
+import { clearLegacyArkKey } from '../lib/capabilities'
 
-type Operation = 'draft' | 'bases' | 'derive' | 'retry' | 'save' | 'reference'
+type Operation = 'load' | 'activate' | 'draft' | 'bases' | 'derive' | 'retry' | 'save' | 'reference' | 'update'
+type SubmitInput = { kind: 'chat'; text: string } | { kind: 'bases' | 'derived' } |
+  { kind: 'frame'; target: AiSlot } | { kind: 'upload'; jobId: string }
+type UpdateInput = { kind: 'reference'; image: string | null } |
+  { kind: 'confirm'; stage: GrowthStage; assetId: string } | { kind: 'reset' }
 
-function createForm(): ForgeForm {
-  return {
-    code: 'plant-' + crypto.randomUUID(),
-    name: '',
-    emoji: '🌱',
-    desc: '',
-    states: Object.fromEntries(FRAME_KEYS.map((frame) => [frame, ''])) as Record<
-      FrameName,
-      string
-    >,
-    stages: { juvenile: '', adult: '', full: '' },
-    careProfile: createCareProfile(),
-  }
+function isPending(job: AiJob): boolean {
+  return job.status === 'queued' || job.status === 'running'
 }
 
-function operationError(error: unknown): string {
-  const raw = (error instanceof Error ? error.message : String(error)).trim()
-  const detail = raw.length > 300 ? raw.slice(0, 300) + '…' : raw
-  if (
-    /401|403|鉴权|AuthenticationFailed|InvalidAccessToken|ExpiredAccessToken|AccessDenied/.test(
-      raw,
-    )
-  )
-    return '密钥验证失败，请在上方检查 AI 素材密钥。'
-  if (/ModelNotOpen|InvalidEndpointOrModel|OpenServiceRejected|未开通/.test(raw))
-    return '方舟模型尚未开通，请按教程在控制台「开通管理」中开通所需模型。'
-  if (/429|FlowLimit|ReqThrottle|Quota/.test(raw))
-    return '请求较多或配额不足，请稍后再试。'
-  if (/DataInspectionFailed|SensitiveContentDetected|内容审核|敏感/.test(raw))
-    return '内容未通过平台审核，请调整植物外形或状态描述后重试。'
-  return detail || '操作未完成，请稍后重试，已完成的图片会保留。'
-}
-
-function shouldStopBatch(error: unknown): boolean {
-  return /401|403|429|鉴权|ModelNotOpen|InvalidEndpointOrModel|OpenServiceRejected|FlowLimit|Quota|网络|HTTP 5\d\d/.test(
-    String(error),
-  )
+function canContinueWhileBlocked(job: AiJob): boolean {
+  return job.status === 'running' || (job.status === 'queued' && job.isUploadOnly === true)
 }
 
 export function useSpeciesForge(options: { onSaved: (code: string) => void }) {
-  const form = reactive<ForgeForm>(createForm())
+  const frames = useForgeFrames()
+  const draft = shallowRef<AiDraft | null>(null)
   const step = shallowRef<ForgeStep>('compose')
+  const phrase = shallowRef('')
+  const localChat = shallowRef<PlantChatMessage | null>(null)
+  const name = shallowRef('')
+  const isPaused = shallowRef(false)
+  const isAiDisabled = shallowRef(false)
   const operation = shallowRef<Operation | null>(null)
-  const isCancelling = shallowRef(false)
-  const regeneratingTarget = shallowRef<FrameTarget | null>(null)
   const errorMessage = shallowRef('')
-  const frames = useForgeFrames(form)
-  const plantReference = usePlantReference()
-  const planning = usePlantPlanning({ onPlan: applyPlan })
-  const phrase = planning.message
-  const hasDraft = planning.hasReadyPlan
-  const canGenerate = computed(() => hasDraft.value && !phrase.value.trim())
-  const referenceMessage = shallowRef('')
+  const referencePreviewUrl = shallowRef('')
+  const regeneratingTarget = shallowRef<FrameTarget | null>(null)
+  const loaded = new Map<AiSlot, string>()
+  let client: ReturnType<typeof aiClient> | null = null
+  let active: AbortController | null = null
+  let isMounted = true
+
+  const form = computed(() => draft.value?.plan ? { ...draft.value.plan, code: `plant-${draft.value.id}` } : null)
+  const hasQueued = computed(() => Boolean(draft.value?.jobs.some(isPending)))
+  const isGenerationBlocked = computed(() => isPaused.value || isAiDisabled.value)
+  const hasDraft = computed(() => Boolean(draft.value?.isPlanReady))
   const isBusy = computed(() => operation.value !== null)
-  const isDrafting = computed(() => operation.value === 'draft')
-  const isGenerating = computed(
-    () => operation.value === 'bases' || operation.value === 'derive',
-  )
   const isSaving = computed(() => operation.value === 'save')
+  const isDrafting = computed(() => operation.value === 'draft')
+  const isGenerating = computed(() => operation.value === 'bases' || operation.value === 'derive')
   const isReadingReference = computed(() => operation.value === 'reference')
-  let isActive = true
-  let controller: AbortController | null = null
-  let styleRefBytes: Uint8Array | null = null
-
-  onUnmounted(() => {
-    isActive = false
-    controller?.abort()
-    styleRefBytes = null
+  const chatMessages = computed(() => {
+    const snapshot = draft.value
+    const plan = snapshot?.isPlanReady ? snapshot.plan : null
+    let messages = snapshot?.messages ?? []
+    if (plan && !messages.some((message) => message.plan)) {
+      const latestReply = messages.filter((message) => message.role === 'assistant').at(-1)
+      messages = messages.map((message) => message === latestReply ? { ...message, plan } : message)
+    }
+    return localChat.value ? [...messages, localChat.value] : messages
   })
+  const planMessageId = computed(() => chatMessages.value.filter((item) => item.plan).at(-1)?.id ?? '')
+  const chatProgress = computed<ChatProgress | null>(() => {
+    if (localChat.value?.status === 'pending') return { label: '正在发送消息', isActive: true }
+    const job = draft.value?.jobs.find((item) => item.type === 'chat' && isPending(item))
+    if (!job) return null
+    if (job.status === 'queued' && isGenerationBlocked.value) {
+      return { label: '对话暂缓', description: '恢复 AI 后继续处理。', isActive: false }
+    }
+    const label = job.status === 'running' ? '正在整理植物方案' : '等待处理你的消息'
+    return isBusy.value
+      ? { label, isActive: true }
+      : { label, description: '可刷新进度查看最新状态。', isActive: false }
+  })
+  const canSendPlanning = computed(() => !hasQueued.value && !isGenerationBlocked.value && phrase.value.length <= 1000 &&
+    Boolean(phrase.value.trim() || draft.value?.hasReference))
+  const canGenerate = computed(() => hasDraft.value && !hasQueued.value && !localChat.value && !isGenerationBlocked.value && !phrase.value.trim())
+  const canRetryPlanning = computed(() => !hasQueued.value && !isGenerationBlocked.value && chatMessages.value.at(-1)?.status === 'error')
 
-  async function runOperation(
-    kind: Operation,
-    action: (signal: AbortSignal) => Promise<void>,
-  ): Promise<void> {
-    if (!isActive || isBusy.value) return
-    const current = new AbortController()
-    controller = current
+  function requireClient() {
+    if (!client) throw new Error('请先激活 AI。')
+    return client
+  }
+
+  function version() {
+    if (!draft.value) throw new Error('草稿尚未加载。')
+    return { draftId: draft.value.id, version: draft.value.version }
+  }
+
+  function clearSession(): void {
+    client = null
+    draft.value = null
+    localChat.value = null
+    name.value = ''
+    isPaused.value = false
+    isAiDisabled.value = false
+    referencePreviewUrl.value = ''
+    step.value = 'compose'
+    loaded.clear()
+    frames.clearAll()
+  }
+
+  async function run(kind: Operation, action: (signal: AbortSignal) => Promise<void>): Promise<void> {
+    if (active || !isMounted) return
+    const controller = new AbortController()
+    active = controller
     operation.value = kind
     errorMessage.value = ''
     try {
-      await action(current.signal)
+      await action(controller.signal)
     } catch (error) {
-      if (isActive)
-        errorMessage.value = current.signal.aborted
-          ? kind === 'reference'
-            ? '已停止读取，原参考图和已完成的图片会保留。'
-            : kind === 'draft'
-              ? '对话已停止，内容已保留，可重试本轮或继续发送。'
-              : '已停止。已完成的图片保留在本次窗口中，可继续补齐；关闭窗口后将丢弃。'
-          : operationError(error)
+      if (!isMounted || controller.signal.aborted) return
+      if (error instanceof AiServiceError && error.status === 401) clearSession()
+      errorMessage.value = error instanceof Error ? error.message : '操作未完成，请重试。'
     } finally {
-      finishOperation()
-    }
-  }
-
-  function finishOperation(): void {
-    controller = null
-    if (!isActive) return
-    operation.value = null
-    regeneratingTarget.value = null
-    isCancelling.value = false
-  }
-
-  async function ensureApiKey(signal: AbortSignal): Promise<string> {
-    const settings = await readSettings()
-    signal.throwIfAborted()
-    const key = settings.arkApiKey.trim()
-    if (!key) throw new Error('鉴权：缺少密钥')
-    return key
-  }
-
-  function validateForm(): void {
-    if (!canGenerate.value)
-      throw new Error('请先在对话中明确植物档案，未发送的修改需先发送或清空。')
-    if (!/^[a-z][a-z0-9-]{0,63}$/.test(form.code))
-      throw new Error('物种标识需为 64 字以内的英文小写、数字和中划线。')
-    if (
-      !form.name.trim() ||
-      form.name.length > 12 ||
-      !form.desc.trim() ||
-      form.desc.length > 120
-    )
-      throw new Error('请填写植物名称（1–12 字）和外形描述（1–120 字）。')
-    if (
-      FRAME_KEYS.some(
-        (frame) => !form.states[frame].trim() || form.states[frame].length > 100,
-      )
-    )
-      throw new Error('请补齐六种状态描述，每条 1–100 字。')
-    validateGrowthDescriptions(form.stages)
-    validateCareProfile(form.careProfile)
-  }
-
-  async function validateAvailability(signal: AbortSignal): Promise<void> {
-    validateForm()
-    const existing = await getCustomSpecies(form.code)
-    signal.throwIfAborted()
-    if (existing) throw new Error('本地植物档案编号冲突，请重新打开创建窗口再试。')
-  }
-
-  function applyPlan(plan: PlantPlan): void {
-    const next: ForgeForm = { ...plan, code: form.code }
-    frames.invalidateForm(next)
-    Object.assign(form, next)
-  }
-
-  async function startDraft(): Promise<void> {
-    await sendPlanning({})
-  }
-
-  async function retryDraft(): Promise<void> {
-    await sendPlanning({ isRetry: true })
-  }
-
-  async function sendPlanning(options: { isRetry?: boolean }): Promise<void> {
-    await runOperation('draft', async (signal) => {
-      const key = await ensureApiKey(signal)
-      referenceMessage.value = ''
-      await planning.discuss({
-        apiKey: key,
-        signal,
-        imageBytes: plantReference.getBytes() ?? undefined,
-        imagePreviewUrl: plantReference.previewUrl.value,
-        isRetry: options.isRetry,
-      })
-    })
-  }
-
-  async function getStyleReference(signal: AbortSignal): Promise<Uint8Array> {
-    if (styleRefBytes) return styleRefBytes
-    const response = await fetch(styleRefUrl, { signal })
-    if (!response.ok) throw new Error('参考图加载失败，请重试。')
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    signal.throwIfAborted()
-    styleRefBytes = bytes
-    return bytes
-  }
-
-  async function generateTargets(
-    targets: FrameTarget[],
-    signal: AbortSignal,
-  ): Promise<void> {
-    const key = await ensureApiKey(signal)
-    const failures: string[] = []
-    for (const target of targets) {
-      signal.throwIfAborted()
-      try {
-        await generateTarget({ target, apiKey: key, signal })
-      } catch (error) {
-        signal.throwIfAborted()
-        if (shouldStopBatch(error)) throw error
-        failures.push(
-          `${GROWTH_STAGE_LABELS[target.stage]}·${FRAME_META[target.frame].label}：${operationError(error)}`,
-        )
+      active = null
+      if (isMounted) {
+        operation.value = null
+        regeneratingTarget.value = null
       }
     }
-    if (failures.length) throw new Error(failures.join('\n'))
   }
 
-  async function generateTarget(options: {
-    target: FrameTarget
-    apiKey: string
-    signal: AbortSignal
-  }): Promise<void> {
-    const { target, apiKey, signal } = options
-    const reference =
-      target.frame === 'idle'
-        ? await getStyleReference(signal)
-        : frames.getBaseBytes(target.stage)
-    const plantRefPngBytes =
-      target.frame === 'idle' ? (plantReference.getBytes() ?? undefined) : undefined
-    await frames.generateOne({ ...target, apiKey, reference, plantRefPngBytes, signal })
+  async function syncFrame(snapshot: AiDraft, target: FrameTarget, signal: AbortSignal, isRetry: boolean): Promise<void> {
+    const { stage, frame } = target
+    const slot = `${stage}:${frame}` as const
+    const id = snapshot.assets[slot]
+    if (loaded.get(slot) === id && (!id || !isRetry || frames.frameStatus[stage][frame] === 'done')) return
+    frames.clearFrame(target)
+    loaded.delete(slot)
+    if (!id) return
+    loaded.set(slot, id)
+    try {
+      await frames.loadFrame({ ...target, signal, download: () => requireClient().download(id, signal) })
+    } catch (error) {
+      signal.throwIfAborted()
+      if (error instanceof AiServiceError && error.status === 401) throw error
+    }
   }
 
-  async function startGenerate(): Promise<void> {
-    await runOperation('bases', async (signal) => {
-      await validateAvailability(signal)
+  async function syncDraft(signal: AbortSignal, isRetry = false): Promise<AiDraft> {
+    const snapshot = await requireClient().draft(signal)
+    signal.throwIfAborted()
+    if (snapshot.id !== draft.value?.id || snapshot.messages.some(({ id }) => id === localChat.value?.id)) {
+      localChat.value = null
+    }
+    draft.value = snapshot
+    if (snapshot.plan) validatePlantPlan(snapshot.plan)
+    for (const frame of FRAME_KEYS) {
+      for (const stage of GROWTH_STAGE_KEYS) await syncFrame(snapshot, { stage, frame }, signal, isRetry)
+    }
+    for (const stage of GROWTH_STAGE_KEYS) frames.confirmedBases[stage] = snapshot.confirmed.includes(stage)
+    for (const job of snapshot.jobs) {
+      if (job.target === 'chat' || job.status === 'done') continue
+      const [stage, frame] = job.target.split(':') as [GrowthStage, FrameName]
+      if (isPending(job)) frames.frameStatus[stage][frame] = job.status === 'running' ? 'running' : 'pending'
+      else if (!snapshot.assets[job.target]) {
+        frames.frameStatus[stage][frame] = 'error'
+        frames.frameErrors[stage][frame] = job.errorMessage ?? '任务未完成。'
+      } else if (frames.anchors[stage][frame]) frames.frameStatus[stage][frame] = 'done'
+    }
+    return snapshot
+  }
+
+  function chooseStep(snapshot: AiDraft): void {
+    if (snapshot.jobs.some((job) => job.target === 'chat') || !snapshot.plan) step.value = 'compose'
+    else if (snapshot.jobs.some((job) => job.target.endsWith(':idle') && isPending(job))) step.value = 'bases'
+    else if (snapshot.jobs.some(isPending)) step.value = 'generate'
+    else if (snapshot.confirmed.length === 3) step.value = 'gallery'
+    else if (Object.keys(snapshot.assets).length || snapshot.jobs.some((job) => job.type === 'image')) step.value = 'bases'
+    else step.value = 'compose'
+  }
+
+  async function waitForJobs(snapshot: AiDraft, signal: AbortSignal): Promise<void> {
+    let latest = snapshot
+    while (latest.jobs.some(isPending)) {
+      if (isGenerationBlocked.value && !latest.jobs.some(canContinueWhileBlocked)) return
+      await aiWait(signal)
+      await syncStatus(signal)
+      latest = await syncDraft(signal)
+    }
+    if (step.value === 'generate') step.value = 'gallery'
+    const failures = latest.jobs.map((job) => job.errorMessage)
+      .filter((message) => message && !latest.messages.some((entry) => entry.errorMessage === message))
+    if (failures.length) errorMessage.value = [...new Set(failures)].join('\n')
+  }
+
+  async function syncStatus(signal: AbortSignal): Promise<void> {
+    const status = await requireClient().status(signal)
+    signal.throwIfAborted()
+    name.value = status.name
+    isPaused.value = status.isPaused
+    isAiDisabled.value = status.isAiDisabled === true
+  }
+
+  async function connect(token: string, signal: AbortSignal): Promise<void> {
+    client = aiClient(token)
+    await syncStatus(signal)
+    const snapshot = await syncDraft(signal, true)
+    referencePreviewUrl.value = snapshot.hasReference ? (await client.reference(signal)).image ?? '' : ''
+    signal.throwIfAborted()
+    chooseStep(snapshot)
+    if (snapshot.jobs.some(isPending)) await waitForJobs(snapshot, signal)
+  }
+
+  function reload(): Promise<void> {
+    return run('load', async (signal) => {
+      await clearLegacyArkKey()
+      signal.throwIfAborted()
+      const token = await readAiToken()
+      if (token) await connect(token, signal)
+    })
+  }
+
+  function activate(input: { code: string; name: string }): Promise<void> {
+    return run('activate', async (signal) => {
+      const token = await activateAi({ ...input, signal })
+      await connect(token, signal)
+    })
+  }
+
+  function forgetActivation(): Promise<void> {
+    return run('load', async (signal) => {
+      await clearAiToken()
+      signal.throwIfAborted()
+      clearSession()
+    })
+  }
+
+  async function submit(input: SubmitInput, signal: AbortSignal, operationId: string = crypto.randomUUID()): Promise<void> {
+    try {
+      await requireClient().submit({ ...input, ...version(), operationId }, signal)
+    } catch (error) {
+      signal.throwIfAborted()
+      if (error instanceof AiServiceError && error.status === 403) isAiDisabled.value = true
+      throw error
+    }
+    signal.throwIfAborted()
+    await waitForJobs(await syncDraft(signal), signal)
+  }
+
+  function sendChat(text: string, retryId?: string): Promise<void> {
+    return run('draft', async (signal) => {
+      const id = retryId ?? crypto.randomUUID()
+      localChat.value = { id, role: 'user', text, status: 'pending', hasImage: draft.value?.hasReference }
+      if (!retryId) phrase.value = ''
+      try {
+        if (retryId) {
+          const snapshot = await syncDraft(signal)
+          if (!localChat.value) return waitForJobs(snapshot, signal)
+        }
+        await submit({ kind: 'chat', text }, signal, id)
+      } catch (error) {
+        if (signal.aborted || localChat.value?.id !== id || (error instanceof AiServiceError && error.status === 401)) throw error
+        localChat.value = { ...localChat.value, status: 'error',
+          errorMessage: error instanceof Error ? error.message : '发送未完成，请重试。' }
+      }
+    })
+  }
+
+  function startDraft(): Promise<void> {
+    if (!canSendPlanning.value) return Promise.resolve()
+    const referencePrompt = draft.value?.plan
+      ? '请结合这张参考照片和前文，更新植物方案。'
+      : '请参考这张照片和前文，规划植物数字分身和养护习性。'
+    const text = phrase.value.trim() || referencePrompt
+    return sendChat(text)
+  }
+
+  function retryDraft(): Promise<void> {
+    const last = chatMessages.value.at(-1)
+    if (!canRetryPlanning.value || last?.role !== 'user') return Promise.resolve()
+    return sendChat(last.text, localChat.value?.id)
+  }
+
+  function startGenerate(): Promise<void> {
+    return run('bases', async (signal) => {
       step.value = 'bases'
-      const targets = GROWTH_STAGE_KEYS.filter(
-        (stage) => frames.frameStatus[stage].idle !== 'done',
-      ).map((stage) => ({ stage, frame: 'idle' as const }))
-      if (targets.length) await generateTargets(targets, signal)
+      if (GROWTH_STAGE_KEYS.every((stage) => draft.value?.assets[`${stage}:idle`])) return
+      await submit({ kind: 'bases' }, signal)
     })
   }
 
-  async function uploadReference(file: File): Promise<void> {
-    await runOperation('reference', async (signal) => {
-      referenceMessage.value = ''
-      const hasGeneratedFrames = frames.doneCount.value > 0
-      await plantReference.replace({ file, signal })
-      signal.throwIfAborted()
-      frames.clearAll()
-      planning.photoChanged(true)
-      referenceMessage.value = hasGeneratedFrames
-        ? '照片已更新，请重新发送以确认档案；旧形象与状态已清除。'
-        : '照片已就绪，直接发送即可识别和规划，不必先填写植物名称。'
-    })
-  }
-
-  function removeReference(): void {
-    if (isBusy.value || !plantReference.getBytes()) return
-    const hasGeneratedFrames = frames.doneCount.value > 0
-    plantReference.clear()
-    frames.clearAll()
-    planning.photoChanged(false)
-    referenceMessage.value = hasGeneratedFrames
-      ? '已移除植物参考图；将使用芽伴默认参考，原有生成结果已清除。'
-      : '已移除植物参考图，将使用芽伴默认参考。'
-  }
-
-  function confirmBase(stage: GrowthStage): void {
-    if (!isBusy.value) frames.confirmBase(stage)
-  }
-
-  async function startDerived(): Promise<void> {
-    if (!frames.hasConfirmedBases.value) return
-    await runOperation('derive', async (signal) => {
-      await validateAvailability(signal)
+  function startDerived(): Promise<void> {
+    return run('derive', async (signal) => {
       step.value = 'generate'
-      const targets = GROWTH_STAGE_KEYS.flatMap((stage) =>
-        FRAME_KEYS.filter(
-          (frame) => frame !== 'idle' && frames.frameStatus[stage][frame] !== 'done',
-        ).map((frame) => ({ stage, frame })),
-      )
-      if (targets.length) await generateTargets(targets, signal)
-      signal.throwIfAborted()
-      step.value = 'gallery'
+      await submit({ kind: 'derived' }, signal)
     })
   }
 
-  async function regenerate(target: FrameTarget): Promise<void> {
-    if (target.frame !== 'idle' && !frames.hasConfirmedBases.value) return
-    await runOperation('retry', async (signal) => {
+  function regenerate(target: FrameTarget): Promise<void> {
+    const slot = `${target.stage}:${target.frame}` as const
+    const jobId = draft.value?.uploadRetries[slot]
+    if (isGenerationBlocked.value && !jobId) return Promise.resolve()
+    return run('retry', async (signal) => {
       regeneratingTarget.value = target
-      if (target.frame === 'idle') step.value = 'bases'
-      await generateTargets([target], signal)
+      await submit(jobId ? { kind: 'upload', jobId } : { kind: 'frame', target: slot }, signal)
+      if (target.frame === 'idle' && draft.value && !draft.value.confirmed.includes(target.stage)) {
+        step.value = 'bases'
+      }
     })
   }
 
-  async function saveToLibrary(): Promise<void> {
-    if (!frames.isAllDone.value) return
-    await runOperation('save', async (signal) => {
-      await validateAvailability(signal)
-      await saveSpeciesToLibrary(buildMetadata(), frames.processedBytes, signal)
-      if (!isActive) return
-      ElMessage.success(form.name.trim() + '已加入植物库，去领养页迎接它吧。')
-      options.onSaved(form.code)
+  async function update(body: UpdateInput, signal: AbortSignal): Promise<void> {
+    await requireClient().update({ ...body, ...version() }, signal)
+    await syncDraft(signal)
+    if (body.kind === 'reference' || body.kind === 'reset') localChat.value = null
+  }
+
+  function confirmBase(stage: GrowthStage): Promise<void> {
+    const assetId = draft.value?.assets[`${stage}:idle`]
+    if (!assetId || !frames.anchors[stage].idle) return Promise.resolve()
+    return run('update', (signal) => update({ kind: 'confirm', stage, assetId }, signal))
+  }
+
+  function uploadReference(file: File): Promise<void> {
+    return run('reference', async (signal) => {
+      const image = await preparePlantReference({ file, signal })
+      let binary = ''
+      for (let offset = 0; offset < image.bytes.length; offset += 16_384) {
+        binary += String.fromCharCode(...image.bytes.subarray(offset, offset + 16_384))
+      }
+      const data = `data:image/png;base64,${btoa(binary)}`
+      await update({ kind: 'reference', image: data }, signal)
+      referencePreviewUrl.value = data
     })
   }
 
-  function buildMetadata(): Omit<CustomSpeciesMeta, 'createdAt'> {
-    return {
-      code: form.code,
-      name: form.name.trim(),
-      emoji: form.emoji.trim() || '🌱',
-      desc: form.desc.trim(),
-      states: { ...form.states },
-      stages: { ...form.stages },
-      artVersion: 2,
-      careProfile: validateCareProfile(form.careProfile),
-      alignment: { version: 1, method: 'automatic', anchors: buildAlignmentAnchors() },
-    }
+  function removeReference(): Promise<void> {
+    return run('reference', async (signal) => {
+      await update({ kind: 'reference', image: null }, signal)
+      referencePreviewUrl.value = ''
+    })
   }
 
-  function buildAlignmentAnchors(): GrowthFrames<SpriteAnchor> {
-    return {
-      juvenile: { ...frames.anchors.juvenile },
-      adult: { ...frames.anchors.adult },
-      full: { ...frames.anchors.full },
-    }
+  function startOver(): Promise<void> {
+    return run('update', async (signal) => {
+      await update({ kind: 'reset' }, signal)
+      referencePreviewUrl.value = ''
+      phrase.value = ''
+      step.value = 'compose'
+    })
+  }
+
+  function saveToLibrary(): Promise<void> {
+    if (!frames.isAllDone.value || !form.value) return Promise.resolve()
+    return run('save', async (signal) => {
+      const plan = form.value
+      if (!plan) return
+      if (!(await getCustomSpecies(plan.code))) {
+        await saveSpeciesToLibrary({ ...plan, artVersion: 2, alignment: { version: 1, method: 'automatic', anchors: {
+          juvenile: { ...frames.anchors.juvenile }, adult: { ...frames.anchors.adult }, full: { ...frames.anchors.full },
+        } } }, frames.processedBytes, signal)
+      }
+      signal.throwIfAborted()
+      await requireClient().update({ kind: 'reset', ...version() }, signal).catch(() => undefined)
+      signal.throwIfAborted()
+      ElMessage.success(`${plan.name}已加入植物库。`)
+      options.onSaved(plan.code)
+    })
   }
 
   function cancelOperation(): void {
-    if (!controller || isSaving.value) return
-    isCancelling.value = true
-    controller.abort()
+    if (!isSaving.value && active) {
+      active.abort()
+      const message = '已停止等待。已提交任务会继续，可刷新进度或稍后打开向导。'
+      if (localChat.value?.status === 'pending') {
+        localChat.value = { ...localChat.value, status: 'error', errorMessage: message }
+      } else errorMessage.value = message
+    }
   }
 
   function goToStep(next: ForgeStep): void {
-    if (isBusy.value) return
-    step.value = next
-    errorMessage.value = ''
+    if (!active) {
+      step.value = next
+      errorMessage.value = ''
+    }
   }
 
-  return {
-    form,
-    step,
-    phrase,
-    hasDraft,
-    canGenerate,
-    chatMessages: planning.messages,
-    planMessageId: planning.planMessageId,
-    canSendPlanning: planning.canSend,
-    canRetryPlanning: planning.canRetry,
-    isDrafting,
-    isGenerating,
-    isSaving,
-    isReadingReference,
-    referencePreviewUrl: plantReference.previewUrl,
-    referenceFileName: plantReference.fileName,
-    referenceDimensions: plantReference.dimensions,
-    referenceMessage,
-    isBusy,
-    isCancelling,
-    regeneratingTarget,
-    errorMessage,
-    frameStatus: frames.frameStatus,
-    frameUrls: frames.frameUrls,
-    frameErrors: frames.frameErrors,
-    confirmedBases: frames.confirmedBases,
-    hasConfirmedBases: frames.hasConfirmedBases,
-    doneCount: frames.doneCount,
-    checkedCount: frames.checkedCount,
-    isAllDone: frames.isAllDone,
-    startDraft,
-    retryDraft,
-    startGenerate,
-    confirmBase,
-    startDerived,
-    regenerate,
-    saveToLibrary,
-    cancelOperation,
-    goToStep,
-    uploadReference,
-    removeReference,
-  }
+  onMounted(reload)
+  onUnmounted(() => {
+    isMounted = false
+    active?.abort()
+  })
+
+  return { ...frames, draft, form, step, phrase, name, isPaused, isAiDisabled, isGenerationBlocked, hasQueued, operation, hasDraft, canGenerate,
+    chatMessages, chatProgress, planMessageId, canSendPlanning, canRetryPlanning, isDrafting, isGenerating, isSaving,
+    isReadingReference, referencePreviewUrl, isBusy, regeneratingTarget, errorMessage, activate, reload,
+    forgetActivation, startOver, startDraft, retryDraft, startGenerate, confirmBase, startDerived, regenerate,
+    saveToLibrary, cancelOperation, goToStep, uploadReference, removeReference }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ForgeForm } from './types'
+import type { ChatProgress } from './types'
 import type { PlantChatMessage } from '../../../lib/plantPlan'
 import ForgeChat from './ForgeChat.vue'
 import ForgeChatComposer from './ForgeChatComposer.vue'
@@ -7,23 +7,20 @@ import ForgePlantPlan from './ForgePlantPlan.vue'
 import ForgeReferenceUpload from './ForgeReferenceUpload.vue'
 
 defineProps<{
-  form: ForgeForm
   phrase: string
   chatMessages: PlantChatMessage[]
   planMessageId: string
+  chatProgress: ChatProgress | null
   hasDraft: boolean
   canGenerate: boolean
   canSend: boolean
   canRetry: boolean
   isDrafting: boolean
-  isCancelling: boolean
   isDisabled: boolean
-  hasKey: boolean
   errorMessage: string
   referencePreviewUrl: string
   referenceFileName: string
   referenceDimensions: string
-  referenceMessage: string
   isReadingReference: boolean
 }>()
 defineEmits<{
@@ -41,18 +38,18 @@ defineEmits<{
   <section class="forge-compose">
     <ForgeChat
       :messages="chatMessages"
-      :plan-message-id="planMessageId"
-      :reference-preview-url="referencePreviewUrl"
+      :progress="chatProgress"
       :can-retry="canRetry"
       :is-disabled="isDisabled"
-      :has-key="hasKey"
       @retry="$emit('retry')"
     >
-      <template #plan>
+      <template #plan="{ entry }">
         <ForgePlantPlan
-          :plan="form"
+          v-if="entry.plan"
+          :plan="entry.plan"
+          :is-latest="entry.id === planMessageId"
           :is-ready="hasDraft"
-          :can-generate="canGenerate && hasKey"
+          :can-generate="canGenerate"
           :is-disabled="isDisabled"
           :has-pending-changes="Boolean(phrase.trim())"
           @generate="$emit('generate')"
@@ -61,14 +58,12 @@ defineEmits<{
     </ForgeChat>
     <ForgeChatComposer
       :message="phrase"
+      :placeholder="chatMessages.at(-1)?.needsClarification ? '直接输入补充信息…' : '输入植物名称、描述或修改意见…'"
       :can-send="canSend"
       :is-disabled="isDisabled"
-      :is-planning="isDrafting"
+      :is-planning="isDrafting || Boolean(chatProgress?.isActive)"
       :is-reading-reference="isReadingReference"
-      :is-cancelling="isCancelling"
-      :has-key="hasKey"
       :error-message="errorMessage"
-      :reference-message="referenceMessage"
       @update:message="$emit('update:phrase', $event)"
       @send="$emit('draft')"
       @cancel="$emit('cancel')"

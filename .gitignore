@@ -10,8 +10,10 @@ assets-src
 
 .DS_Store
 
-# sprite-studio：火山方舟 Ark 生图/文案接口密钥
+# 三端本地配置及 sprite-studio 密钥
 .env
+.env.*
+!.env.example
 
 # 本地维护文档：保留本机文件，不纳入后续提交
 /docs/

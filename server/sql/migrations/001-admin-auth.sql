@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS admins (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(48) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+  password_hash VARCHAR(161) CHARACTER SET ascii NOT NULL
+) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token_hash BINARY(32) NOT NULL PRIMARY KEY,
+  admin_id INT UNSIGNED NOT NULL,
+  expires_at DATETIME(3) NOT NULL,
+  INDEX idx_admin_sessions_expiry (expires_at),
+  FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

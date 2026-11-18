@@ -7,6 +7,7 @@ import {
 } from '../../../lib/spriteFrames'
 import type { FrameTarget, GrowthFrames } from '../../../lib/spriteFrames'
 import type { GrowthStage } from '../../../lib/growth'
+import type { AiDraft } from '../../../lib/aiService'
 import type { GrowthFrameStatus } from './types'
 import { FRAME_META, FRAME_STATUS_LABELS } from './types'
 import AppIcon from '../../common/AppIcon.vue'
@@ -18,6 +19,8 @@ const props = defineProps<{
   checkedCount: number
   regeneratingTarget: FrameTarget | null
   isDisabled: boolean
+  isPaused: boolean
+  uploadRetries: AiDraft['uploadRetries']
 }>()
 defineEmits<{ regenerate: [target: FrameTarget] }>()
 const selectedStage = shallowRef<GrowthStage>('juvenile')
@@ -76,10 +79,12 @@ const regeneratingFrame = computed(() =>
           text
           size="small"
           :loading="regeneratingFrame === frame"
-          :disabled="isDisabled"
+          :disabled="isDisabled || (isPaused && !uploadRetries[`${selectedStage}:${frame}`])"
           @click="$emit('regenerate', { stage: selectedStage, frame })"
           ><AppIcon v-if="regeneratingFrame !== frame" name="refresh" :size="13" />{{
-            visibleStatus[frame] === 'error' ? '重试' : '重生成'
+            uploadRetries[`${selectedStage}:${frame}`]
+              ? '重试上传'
+              : visibleStatus[frame] === 'error' ? '重试' : '重生成'
           }}</el-button
         >
       </article>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { FRAME_KEYS } from '../../../lib/spriteStudio'
+import { FRAME_KEYS } from '../../../lib/spriteFrames'
 import { GROWTH_STAGE_KEYS, GROWTH_STAGE_LABELS } from '../../../lib/spriteFrames'
 import type { GrowthFrameStatus } from './types'
 import { FRAME_META, FRAME_STATUS_LABELS } from './types'
@@ -12,29 +12,42 @@ const props = defineProps<{
   previewUrl?: string
   doneCount: number
   isGenerating: boolean
+  hasPendingJobs: boolean
+  isGenerationBlocked: boolean
 }>()
-const progress = computed(() => Math.round((props.doneCount / 18) * 100))
+const totalFrames = GROWTH_STAGE_KEYS.length * FRAME_KEYS.length
+const progress = computed(() => Math.round((props.doneCount / totalFrames) * 100))
+const phaseLabel = computed(() => {
+  const statuses = GROWTH_STAGE_KEYS.flatMap((stage) => Object.values(props.frameStatus[stage]))
+  if (statuses.includes('checking')) return '正在检查并对齐新图片'
+  if (statuses.includes('running')) return '正在绘制互动状态'
+  if (props.hasPendingJobs) return props.isGenerationBlocked ? '生成队列暂缓' : '互动状态排队中'
+  if (props.doneCount === totalFrames) return '全部图片已就绪'
+  return props.isGenerating ? '正在提交生成任务' : '还有图片待补齐'
+})
 </script>
 <template>
-  <section class="generation" aria-live="polite">
-    <h3>{{ isGenerating ? '正在绘制你的' : '你的植物形象' }}{{ name }}</h3>
+  <section class="generation" aria-label="互动状态生成进度">
+    <h3>{{ name ? `${name}的互动状态` : '互动状态' }}</h3>
     <p class="muted">以已确认主形象生成互动状态，每帧自动检测、对齐并复检</p>
     <div class="generation-preview">
       <img v-if="previewUrl" :src="previewUrl" :alt="name" draggable="false" />
       <div v-else class="preview-wait">
-        <AppIcon name="leaf" :size="48" /><span>{{
-          isGenerating ? '第一片叶子，正在生长…' : '等待生成基础形象'
-        }}</span>
+        <AppIcon name="leaf" :size="48" />
       </div>
     </div>
     <div class="generation-progress">
+      <div class="progress-caption" role="status">
+        <strong>{{ phaseLabel }}</strong>
+        <span>{{ doneCount }} / {{ totalFrames }} 帧通过检查</span>
+      </div>
       <el-progress
+        aria-label="通过检查的图片比例"
         :percentage="progress"
         :show-text="false"
         :stroke-width="8"
         color="#c87955"
       />
-      <p>已完成 {{ doneCount }} / 18 帧</p>
     </div>
     <section v-for="stage in GROWTH_STAGE_KEYS" :key="stage" class="stage-progress">
       <h4 class="stage-title">{{ GROWTH_STAGE_LABELS[stage] }}</h4>
@@ -63,8 +76,10 @@ const progress = computed(() => Math.round((props.doneCount / 18) * 100))
     <p class="inline-note generation-note">
       <AppIcon name="info" :size="14" />{{
         isGenerating
-          ? '生成需要一些时间，可随时停止；已完成的图片保留在本次窗口中。'
-          : '可继续补齐缺失状态，或进入预览单独重试。关闭窗口会丢弃未入库图片。'
+          ? '停止等待或关闭窗口后，已提交的任务会继续。'
+          : hasPendingJobs
+            ? '进度保存在云端草稿中，可刷新或稍后查看。'
+            : '可补齐缺失状态，或进入预览单独重试。'
       }}
     </p>
   </section>
@@ -104,12 +119,17 @@ const progress = computed(() => Math.round((props.doneCount / 18) * 100))
   width: 80%;
   margin: 20px auto;
 }
-.generation-progress p {
-  margin: 8px 0 0;
-  text-align: center;
-  font-size: 11px;
+.progress-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0 0 8px;
+  font-size: 12px;
   color: var(--sprout-muted);
 }
+.progress-caption strong { color: #526b48; }
+.progress-caption span { font-variant-numeric: tabular-nums; }
 .status-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -170,5 +190,8 @@ const progress = computed(() => Math.round((props.doneCount / 18) * 100))
   to {
     transform: rotate(360deg);
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-ring { animation: none; }
 }
 </style>

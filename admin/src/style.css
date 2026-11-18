@@ -1,0 +1,77 @@
+:root {
+  --color-text: #1e2925;
+  --color-muted: #54645e;
+  --color-line: #dce4df;
+  --color-surface: #fff;
+  --color-subtle: #f4f7f5;
+  --color-selection: #e3efe7;
+  --el-color-primary: #2a694e;
+  --el-color-primary-light-3: #427c63;
+  --el-color-primary-light-5: #668c79;
+  --el-color-primary-light-7: #adccba;
+  --el-color-primary-light-8: #dcebe2;
+  --el-color-primary-light-9: #edf5ef;
+  --el-color-primary-dark-2: #224e3b;
+  --el-font-family: inherit;
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-secondary: var(--color-muted);
+  --el-border-color: var(--color-line);
+  font-family: system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-subtle);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid #598c72;
+  outline-offset: 2px;
+}
+
+.form-error {
+  margin: 0.65rem 0;
+  font-size: 0.875rem;
+  color: #a52e2a;
+}
+
+.session-loading {
+  margin: 3rem auto;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.ops-heading, .ops-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ops-heading { justify-content: space-between; margin-bottom: 0.9rem; }
+.ops-heading h1, .ops-heading h2 { margin: 0; }
+.ops-heading h2 { font-size: 1.05rem; }
+.ops-heading small, .ops-detail { color: var(--color-muted); font-size: 0.82rem; }
+.ops-panel { padding: 1rem 1.15rem; margin: 0 0 1rem; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); }
+.ops-panel--table { padding: 0; overflow: hidden; }
+.ops-panel--table > .ops-heading { margin: 0; padding: 0.85rem 1.15rem; }
+.ops-panel--table .el-table { --el-table-header-bg-color: var(--color-subtle); --el-table-border-color: var(--color-line); }
+.ops-controls { margin: 0; }
+.ops-controls > .el-input { flex: 1 1 14rem; max-width: 24rem; }
+.ops-controls .el-button { margin-left: 0; }
+.el-button .app-icon { margin-inline-end: 0.3rem; }
+.ops-select { width: 8rem; }
+.ops-success { color: var(--el-color-primary-dark-2); font-size: 0.85rem; }
+
+@media (max-width: 500px) {
+  .ops-panel { padding: 0.9rem; }
+  .ops-panel--table { padding: 0; }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "sproutkin-server",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "db:migrate": "node --env-file=.env dist/scripts/migrate.js",
+    "start": "node --env-file=.env dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.5.1",
+    "@nestjs/core": "12.5.1",
+    "@nestjs/platform-express": "12.5.1",
+    "@volcengine/tos-sdk": "2.9.1",
+    "mysql2": "3.24.6",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "5.9.3"
+  }
+}

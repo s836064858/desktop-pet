@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue'
+import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSpeciesForge } from '../../composables/useSpeciesForge'
-import ForgeApiKey from './forge/ForgeApiKey.vue'
+import ForgeActivation from './forge/ForgeActivation.vue'
 import ForgeCompose from './forge/ForgeCompose.vue'
 import ForgeProgress from './forge/ForgeProgress.vue'
 import ForgeGallery from './forge/ForgeGallery.vue'
-import ForgeKeyRequired from './forge/ForgeKeyRequired.vue'
 import ForgeBases from './forge/ForgeBases.vue'
 import { FRAME_KEYS, GROWTH_STAGE_KEYS } from '../../lib/spriteFrames'
 import AppIcon from '../common/AppIcon.vue'
@@ -16,12 +15,18 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   saved: [code: string]
 }>()
-const hasKey = shallowRef(false)
-const isKeyBusy = shallowRef(true)
-const hasKeyReadError = shallowRef(false)
-const isKeyEditorOpen = shallowRef(false)
-const isKeyGuideOpen = shallowRef(false)
 const {
+  draft,
+  name,
+  operation,
+  isPaused,
+  isAiDisabled,
+  isGenerationBlocked,
+  hasQueued,
+  activate,
+  reload,
+  forgetActivation,
+  startOver,
   form,
   step,
   phrase,
@@ -29,9 +34,6 @@ const {
   isDrafting,
   isReadingReference,
   referencePreviewUrl,
-  referenceFileName,
-  referenceDimensions,
-  referenceMessage,
   uploadReference,
   removeReference,
   isGenerating,
@@ -43,13 +45,13 @@ const {
   isBusy: isForgeBusy,
   doneCount,
   isAllDone,
-  isCancelling,
   confirmedBases,
   hasConfirmedBases,
   frameErrors,
   checkedCount,
   canGenerate,
   chatMessages,
+  chatProgress,
   planMessageId,
   canSendPlanning,
   canRetryPlanning,
@@ -78,34 +80,27 @@ const previewUrl = computed(() => {
     ) ?? 'juvenile'
   return frameUrls[stage].idle
 })
-const isBusy = computed(() => isForgeBusy.value || isKeyBusy.value)
+const isBusy = computed(() => isForgeBusy.value || hasQueued.value)
+const sessionStatus = computed(() => {
+  if (isAiDisabled.value) return '你的 AI 已停用；已有素材仍可入库'
+  if (isPaused.value) return 'AI 已暂停；已有素材仍可入库'
+  if (hasQueued.value) return '任务已提交，关闭后仍继续'
+  return ''
+})
 
 function onSaved(code: string): void {
   emit('saved', code)
   emit('update:modelValue', false)
 }
-function onKeyStatus(status: {
-  hasKey: boolean
-  isBusy: boolean
-  hasReadError: boolean
-}): void {
-  hasKey.value = status.hasKey
-  isKeyBusy.value = status.isBusy
-  hasKeyReadError.value = status.hasReadError
-}
 function requestClose(done: () => void): void {
-  if (isBusy.value) {
-    ElMessage.info(
-      isSaving.value
-        ? '正在入库，请完成后再关闭。'
-        : '正在处理，请先停止当前操作再关闭。',
-    )
+  if (isSaving.value) {
+    ElMessage.info('正在入库，请完成后再关闭。')
     return
   }
   done()
 }
 function onVisibleChange(value: boolean): void {
-  if (!value && isBusy.value) return
+  if (!value && isSaving.value) return
   emit('update:modelValue', value)
 }
 </script>
@@ -119,8 +114,8 @@ function onVisibleChange(value: boolean): void {
     align-center
     append-to-body
     :close-on-click-modal="false"
-    :close-on-press-escape="!isBusy"
-    :show-close="!isBusy"
+    :close-on-press-escape="!isSaving"
+    :show-close="!isSaving"
     :before-close="requestClose"
     @update:model-value="onVisibleChange"
   >
@@ -129,17 +124,12 @@ function onVisibleChange(value: boolean): void {
         <div class="forge-title">
           <AppIcon name="leaf" :size="25" /><span>AI 创建植物</span>
         </div>
-        <ForgeApiKey
-          v-model:is-open="isKeyEditorOpen"
-          v-model:is-guide-open="isKeyGuideOpen"
-          :is-disabled="isForgeBusy"
-          @status="onKeyStatus"
-        />
+        <span v-if="name">{{ name }}</span>
       </div>
       <p v-if="step === 'compose'" class="forge-subtitle">
         聊聊你的植物，一起创造它的数字分身
       </p>
-      <nav class="forge-steps" aria-label="生成步骤">
+      <nav v-if="draft" class="forge-steps" aria-label="生成步骤">
         <div
           v-for="(title, index) in stepTitles"
           :key="title"
@@ -157,32 +147,37 @@ function onVisibleChange(value: boolean): void {
       </nav>
     </template>
     <div class="forge-body">
-      <ForgeKeyRequired
-        v-if="step === 'compose' && !hasKey"
-        :is-loading="isKeyBusy"
-        :has-read-error="hasKeyReadError"
-        @configure="isKeyEditorOpen = true"
-        @show-guide="isKeyGuideOpen = true"
+      <ForgeActivation
+        v-if="!draft"
+        :is-busy="isForgeBusy"
+        :error-message="errorMessage"
+        @activate="activate"
+        @reload="reload"
+        @forget="forgetActivation"
       />
+      <div v-if="draft" class="forge-session">
+        <span role="status">{{ sessionStatus }}</span>
+        <el-button size="small" :disabled="isForgeBusy" @click="reload">刷新进度</el-button>
+        <el-popconfirm title="清空当前云端草稿？" @confirm="startOver">
+          <template #reference><el-button size="small" :disabled="isBusy">重新开始</el-button></template>
+        </el-popconfirm>
+      </div>
       <ForgeCompose
-        v-else-if="step === 'compose'"
-        :form="form"
+        v-if="draft && step === 'compose'"
         v-model:phrase="phrase"
         :has-draft="hasDraft"
         :plan-message-id="planMessageId"
         :can-generate="canGenerate"
-        :is-cancelling="isCancelling"
         :error-message="errorMessage"
         :chat-messages="chatMessages"
+        :chat-progress="chatProgress"
         :can-send="canSendPlanning"
         :can-retry="canRetryPlanning"
         :is-drafting="isDrafting"
         :is-disabled="isBusy"
-        :has-key="hasKey"
         :reference-preview-url="referencePreviewUrl"
-        :reference-file-name="referenceFileName"
-        :reference-dimensions="referenceDimensions"
-        :reference-message="referenceMessage"
+        reference-file-name="植物参考图"
+        reference-dimensions=""
         :is-reading-reference="isReadingReference"
         @draft="startDraft"
         @retry="retryDraft"
@@ -192,46 +187,50 @@ function onVisibleChange(value: boolean): void {
         @remove-reference="removeReference"
       />
       <ForgeBases
-        v-else-if="step === 'bases'"
+        v-else-if="draft && step === 'bases'"
         :frame-urls="frameUrls"
         :frame-status="frameStatus"
         :confirmed-bases="confirmedBases"
         :frame-errors="frameErrors"
         :is-disabled="isBusy"
+        :is-paused="isGenerationBlocked"
+        :upload-retries="draft.uploadRetries"
         @confirm="confirmBase"
         @regenerate="regenerate"
       />
       <ForgeProgress
-        v-else-if="step === 'generate'"
-        :name="form.name"
+        v-else-if="draft && step === 'generate'"
+        :name="form?.name ?? ''"
         :frame-status="frameStatus"
         :preview-url="previewUrl"
         :done-count="doneCount"
         :is-generating="isGenerating"
+        :has-pending-jobs="hasQueued"
+        :is-generation-blocked="isGenerationBlocked"
       />
       <ForgeGallery
-        v-else
+        v-else-if="draft"
         :frame-urls="frameUrls"
         :frame-status="frameStatus"
         :regenerating-target="regeneratingTarget"
         :frame-errors="frameErrors"
         :checked-count="checkedCount"
         :is-disabled="isBusy"
+        :is-paused="isGenerationBlocked"
+        :upload-retries="draft.uploadRetries"
         @regenerate="regenerate"
       />
     </div>
-    <template v-if="step !== 'compose'" #footer>
+    <template v-if="draft && step !== 'compose'" #footer>
       <p v-if="errorMessage" class="inline-note error-note forge-error" role="alert">
         {{ errorMessage }}
       </p>
       <div class="forge-footer">
         <el-button
           v-if="isForgeBusy && !isSaving"
-          :loading="isCancelling"
-          :disabled="isCancelling"
           @click="cancelOperation"
           >{{
-            isReadingReference ? '停止读取' : isDrafting ? '停止对话' : '停止生成'
+            operation === 'reference' ? '停止读取' : '停止等待'
           }}</el-button
         >
         <el-button v-else :disabled="isBusy" @click="goToStep('compose')"
@@ -241,11 +240,11 @@ function onVisibleChange(value: boolean): void {
           v-if="step === 'bases'"
           type="primary"
           :loading="isGenerating"
-          :disabled="!hasConfirmedBases || isBusy"
+          :disabled="!hasConfirmedBases || isBusy || isGenerationBlocked"
           @click="startDerived"
           >{{ hasConfirmedBases ? '生成互动状态' : '请确认三个形象' }}</el-button
         >
-        <el-button v-else-if="step === 'generate' && !isBusy" @click="startDerived"
+        <el-button v-else-if="step === 'generate' && !isBusy" :disabled="isGenerationBlocked" @click="startDerived"
           >继续补齐</el-button
         >
         <el-button
@@ -258,7 +257,7 @@ function onVisibleChange(value: boolean): void {
         >
         <el-button
           v-if="step === 'gallery' && doneCount < 18"
-          :disabled="isBusy"
+          :disabled="isBusy || isGenerationBlocked"
           @click="startDerived"
           >补齐缺失状态</el-button
         >
@@ -344,6 +343,14 @@ function onVisibleChange(value: boolean): void {
 .forge-body {
   padding: 0 2px 4px;
 }
+.forge-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.forge-session span { margin-right: auto; }
 .forge-error {
   margin: 0 0 12px;
   text-align: left;

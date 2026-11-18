@@ -3,14 +3,12 @@ import AppIcon from '../../common/AppIcon.vue'
 
 const props = defineProps<{
   message: string
+  placeholder: string
   canSend: boolean
   isDisabled: boolean
   isPlanning: boolean
   isReadingReference: boolean
-  isCancelling: boolean
-  hasKey: boolean
   errorMessage: string
-  referenceMessage: string
 }>()
 const emit = defineEmits<{
   'update:message': [value: string]
@@ -19,22 +17,19 @@ const emit = defineEmits<{
 }>()
 
 function send(): void {
-  if (props.canSend && !props.isDisabled && props.hasKey) emit('send')
+  if (props.canSend && !props.isDisabled) emit('send')
 }
 function onKeydown(event: KeyboardEvent): void {
-  if (event.isComposing || event.key !== 'Enter' || !(event.metaKey || event.ctrlKey))
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229)
     return
   event.preventDefault()
-  send()
+  if (!event.repeat) send()
 }
 </script>
 
 <template>
   <form class="chat-composer" aria-label="植物规划输入区" @submit.prevent="send">
     <p v-if="errorMessage" class="composer-error" role="alert">{{ errorMessage }}</p>
-    <p v-else-if="referenceMessage" class="reference-status" role="status">
-      {{ referenceMessage }}
-    </p>
     <div class="composer-surface">
       <el-input
         :model-value="message"
@@ -43,7 +38,7 @@ function onKeydown(event: KeyboardEvent): void {
         maxlength="1000"
         show-word-limit
         aria-label="植物规划消息"
-        placeholder="继续调整，或上传植物照片…"
+        :placeholder="placeholder"
         :disabled="isDisabled"
         @update:model-value="$emit('update:message', $event)"
         @keydown="onKeydown"
@@ -54,11 +49,9 @@ function onKeydown(event: KeyboardEvent): void {
           v-if="isPlanning || isReadingReference"
           class="stop-button"
           size="small"
-          :loading="isCancelling"
-          :disabled="isCancelling"
           @click="$emit('cancel')"
-          ><AppIcon v-if="!isCancelling" name="stop" :size="14" />{{
-            isReadingReference ? '停止读取' : '停止对话'
+          ><AppIcon name="stop" :size="14" />{{
+            isReadingReference ? '停止处理' : '停止等待'
           }}</el-button
         >
         <el-button
@@ -66,20 +59,13 @@ function onKeydown(event: KeyboardEvent): void {
           class="send-button"
           type="primary"
           native-type="submit"
-          :disabled="isDisabled || !hasKey || !canSend"
+          :disabled="isDisabled || !canSend"
           aria-label="发送消息"
-          title="发送消息（Ctrl / ⌘ + Enter）"
+          title="回车发送，Shift + 回车换行"
           ><AppIcon name="send" :size="18"
         /></el-button>
       </div>
     </div>
-    <p class="composer-note">
-      {{
-        hasKey
-          ? '原图仅用于识别与主形象，后续状态沿用已确认形象。'
-          : '请先配置密钥，再开始对话。'
-      }}
-    </p>
   </form>
 </template>
 
@@ -148,29 +134,16 @@ function onKeydown(event: KeyboardEvent): void {
 .stop-button :deep(span) {
   gap: 5px;
 }
-.composer-note {
-  margin: 8px 3px 0;
-  color: #8a9580;
-  font-size: 10px;
-  line-height: 1.7;
-}
-.composer-error,
-.reference-status {
+.composer-error {
   margin: 0 0 10px;
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 11px;
   line-height: 1.7;
   overflow-wrap: anywhere;
-}
-.composer-error {
   max-height: 90px;
   overflow-y: auto;
   background: #fbede3;
   color: #a84d37;
-}
-.reference-status {
-  color: #5c7a50;
-  background: #f1f4e9;
 }
 </style>

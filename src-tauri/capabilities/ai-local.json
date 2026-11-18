@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "ai-local",
+  "description": "芽伴桌面面板访问指定 AI 服务",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "http://127.0.0.1:3000/api/v1/ai/*" }]
+    }
+  ]
+}

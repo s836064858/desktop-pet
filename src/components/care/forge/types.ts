@@ -3,6 +3,11 @@ import type { CareProfile } from '../../../lib/careProfile'
 import type { GrowthDescriptions, GrowthFrames } from '../../../lib/spriteFrames'
 
 export type ForgeStep = 'compose' | 'bases' | 'generate' | 'gallery'
+export interface ChatProgress {
+  label: string
+  description?: string
+  isActive: boolean
+}
 export type FrameStatus = 'pending' | 'running' | 'checking' | 'done' | 'error'
 export type GrowthFrameStatus = GrowthFrames<FrameStatus>
 export interface ForgeForm {

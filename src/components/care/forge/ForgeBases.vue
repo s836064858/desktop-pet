@@ -2,6 +2,7 @@
 import { GROWTH_STAGE_KEYS, GROWTH_STAGE_LABELS } from '../../../lib/spriteFrames'
 import type { GrowthFrames, FrameTarget } from '../../../lib/spriteFrames'
 import type { GrowthStage } from '../../../lib/growth'
+import type { AiDraft } from '../../../lib/aiService'
 import type { GrowthFrameStatus } from './types'
 import { FRAME_STATUS_LABELS } from './types'
 import AppIcon from '../../common/AppIcon.vue'
@@ -12,6 +13,8 @@ defineProps<{
   frameErrors: GrowthFrames<string>
   confirmedBases: Record<GrowthStage, boolean>
   isDisabled: boolean
+  isPaused: boolean
+  uploadRetries: AiDraft['uploadRetries']
 }>()
 defineEmits<{
   confirm: [stage: GrowthStage]
@@ -80,10 +83,12 @@ defineEmits<{
             frameStatus[stage].idle === 'running' ||
             frameStatus[stage].idle === 'checking'
           "
-          :disabled="isDisabled"
+          :disabled="isDisabled || (isPaused && !uploadRetries[`${stage}:idle`])"
           @click="$emit('regenerate', { stage, frame: 'idle' })"
           >{{
-            frameStatus[stage].idle === 'error'
+            uploadRetries[`${stage}:idle`]
+              ? '重试上传'
+              : frameStatus[stage].idle === 'error'
               ? '重试'
               : frameUrls[stage].idle
                 ? '重新绘制'

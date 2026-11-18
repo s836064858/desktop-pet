@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
 import type { PlantChatMessage } from '../../../lib/plantPlan'
+import type { ChatProgress } from './types'
 import AppIcon from '../../common/AppIcon.vue'
 
 const props = defineProps<{
   messages: PlantChatMessage[]
-  planMessageId: string
-  referencePreviewUrl: string
+  progress: ChatProgress | null
   canRetry: boolean
   isDisabled: boolean
-  hasKey: boolean
 }>()
 defineEmits<{ retry: [] }>()
 const history = useTemplateRef<HTMLElement>('history')
+const latest = computed(() => props.messages.at(-1))
 let resizeObserver: ResizeObserver | null = null
 let shouldFollowLatest = true
 
@@ -33,9 +33,14 @@ function onResize(): void {
   if (shouldFollowLatest) scrollToLatest()
 }
 
-watch([() => props.messages.at(-1), () => props.planMessageId], scrollToLatest, {
-  flush: 'post',
-})
+watch(
+  [() => latest.value?.id, () => latest.value?.status, () => props.progress?.label],
+  ([id], [previousId]) => {
+    const isNewUserMessage = id !== previousId && latest.value?.role === 'user'
+    if (isNewUserMessage || shouldFollowLatest) scrollToLatest()
+  },
+  { flush: 'post' },
+)
 onMounted(() => {
   resizeObserver = new ResizeObserver(onResize)
   if (history.value) resizeObserver.observe(history.value)
@@ -48,15 +53,15 @@ onUnmounted(() => resizeObserver?.disconnect())
   <section
     ref="history"
     class="chat-transcript"
-    :class="{ 'is-empty': !messages.length }"
+    :class="{ 'is-empty': !messages.length && !progress }"
     aria-label="植物规划对话"
     @scroll="onScroll"
   >
-    <div v-if="!messages.length" class="chat-welcome">
+    <div v-if="!messages.length && !progress" class="chat-welcome">
       <span class="welcome-icon"><AppIcon name="leaf" :size="28" /></span>
-      <h3 class="welcome-title">从一张照片，或一个想法开始</h3>
+      <h3 class="welcome-title">你想做一株什么植物？</h3>
       <p class="welcome-description">
-        告诉我你想养什么，或直接上传植物照片。<br />我们一起确定它的外形、成长形态和养护习性。
+        输入植物名，或描述它的叶子、花色和株形。<br />也可以添加一张照片作参考。
       </p>
       <span class="welcome-hint">图片支持 PNG / JPEG / WebP · ≤10MB</span>
     </div>
@@ -67,40 +72,35 @@ onUnmounted(() => resizeObserver?.disconnect())
         /></span>
         <div class="message-content">
           <span v-if="entry.role === 'assistant'" class="chat-role">芽伴</span>
-          <div class="message-bubble">
+          <div class="message-bubble" :class="{ 'question-bubble': entry.needsClarification }">
+            <span v-if="entry.needsClarification" class="question-label">待补充信息</span>
             <p class="chat-text">{{ entry.text }}</p>
-            <img
-              v-if="
-                entry.hasImage &&
-                entry.imagePreviewUrl &&
-                entry.imagePreviewUrl === referencePreviewUrl
-              "
-              class="message-photo"
-              :src="referencePreviewUrl"
-              alt="这条消息附带的植物参考图"
-              draggable="false"
-            />
-            <p v-else-if="entry.hasImage" class="chat-attachment">
+            <p v-if="entry.hasImage" class="chat-attachment">
               <AppIcon name="image" :size="13" />已附植物参考图
             </p>
           </div>
-          <div v-if="entry.status !== 'done'" class="chat-status">
-            <span>{{
-              entry.status === 'pending' ? '芽伴正在整理…' : '本轮未完成，内容已保留'
-            }}</span>
+          <div v-if="entry.status === 'error'" class="chat-status" role="alert">
+            <span>{{ entry.errorMessage || '本轮未完成，内容已保留' }}</span>
             <el-button
-              v-if="entry.id === messages.at(-1)?.id && canRetry"
+              v-if="entry.id === latest?.id && canRetry"
               text
               size="small"
-              :disabled="isDisabled || !hasKey"
+              :disabled="isDisabled"
               @click="$emit('retry')"
               ><AppIcon name="refresh" :size="12" />重试本轮</el-button
             >
           </div>
-          <slot
-            v-if="entry.id === planMessageId && entry.role === 'assistant'"
-            name="plan"
-          />
+          <slot v-if="entry.role === 'assistant'" name="plan" :entry="entry" />
+        </div>
+      </li>
+      <li v-if="progress" class="chat-entry assistant" key="chat-progress">
+        <span class="assistant-avatar"><AppIcon name="leaf" :size="20" /></span>
+        <div class="progress-bubble" role="status">
+          <span v-if="progress.isActive" class="progress-ring" aria-hidden="true" />
+          <div>
+            <strong>{{ progress.label }}</strong>
+            <p v-if="progress.description">{{ progress.description }}</p>
+          </div>
         </div>
       </li>
     </ol>
@@ -204,6 +204,15 @@ onUnmounted(() => resizeObserver?.disconnect())
 .user .message-bubble {
   background: #e8efdf;
 }
+.question-bubble {
+  border-left: 3px solid #9bac87;
+}
+.question-label {
+  display: block;
+  color: #586f4c;
+  font-size: 11px;
+  font-weight: 600;
+}
 .chat-text {
   margin: 0;
   color: #4f6548;
@@ -211,16 +220,6 @@ onUnmounted(() => resizeObserver?.disconnect())
   line-height: 1.9;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.message-photo {
-  display: block;
-  width: 230px;
-  max-width: 100%;
-  max-height: 160px;
-  object-fit: contain;
-  object-position: left center;
-  margin-top: 10px;
-  border-radius: 7px;
 }
 .chat-attachment {
   display: flex;
@@ -236,8 +235,8 @@ onUnmounted(() => resizeObserver?.disconnect())
   align-items: center;
   gap: 8px;
   margin: 5px 0 0;
-  color: #939d86;
-  font-size: 10px;
+  color: #a84d37;
+  font-size: 11px;
 }
 .chat-status :deep(.el-button) {
   padding: 3px;
@@ -246,6 +245,36 @@ onUnmounted(() => resizeObserver?.disconnect())
 }
 .chat-status :deep(.el-button > span) {
   gap: 5px;
+}
+.progress-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid #dbe4d3;
+  border-radius: 10px;
+  background: #f0f4eb;
+  color: #4f6548;
+  font-size: 12px;
+}
+.progress-bubble p {
+  margin: 4px 0 0;
+  font-size: 11px;
+}
+.progress-ring {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border: 2px solid #c0ceb6;
+  border-top-color: #547748;
+  border-radius: 50%;
+  animation: progress-spin 0.9s linear infinite;
+}
+@keyframes progress-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-ring { animation: none; }
 }
 @media (max-width: 620px) {
   .chat-entry.assistant {

@@ -15,16 +15,21 @@ defineProps<{
   isDisabled: boolean
   hasPendingChanges: boolean
   isReady: boolean
+  isLatest: boolean
 }>()
 defineEmits<{ generate: [] }>()
 </script>
 
 <template>
-  <section class="plant-plan" aria-label="当前植物方案">
+  <section
+    class="plant-plan"
+    :class="{ 'is-history': !isLatest }"
+    :aria-label="isLatest ? '最新植物方案' : '历史植物方案'"
+  >
     <div class="plan-heading">
       <AppIcon name="leaf" :size="24" />
       <h3 class="plan-name">{{ plan.name }}</h3>
-      <span class="plan-status">{{ isReady ? '当前方案' : '待更新' }}</span>
+      <span class="plan-status">{{ isLatest ? (isReady ? '当前方案' : '待更新') : '历史方案' }}</span>
     </div>
     <p class="plan-description">{{ plan.desc }}</p>
     <div class="plan-stages" aria-label="三阶段形态">
@@ -64,7 +69,7 @@ defineEmits<{ generate: [] }>()
         </dl>
       </div>
     </details>
-    <div class="plan-actions">
+    <div v-if="isLatest && isReady" class="plan-actions">
       <el-button
         class="generate-button"
         type="primary"
@@ -76,9 +81,7 @@ defineEmits<{ generate: [] }>()
         {{
           hasPendingChanges
             ? '还有未发送的修改，请先发送或清空。'
-            : isReady
-              ? '还想调整？继续告诉我就好。'
-              : '请先完成本轮对话，再确认方案。'
+            : '还想调整？继续告诉我就好。'
         }}
       </p>
     </div>
@@ -92,6 +95,14 @@ defineEmits<{ generate: [] }>()
   border: 1px solid #b9c7ab;
   border-radius: 12px;
   background: #fffef9;
+}
+.plant-plan.is-history {
+  border-color: var(--sprout-line);
+  background: #fafaf5;
+}
+.is-history .plan-status {
+  background: #eceee5;
+  color: #657260;
 }
 .plan-heading {
   display: flex;

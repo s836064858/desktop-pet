@@ -30,22 +30,6 @@
     "sql:allow-close",
     "store:default",
     "log:default",
-    {
-      "identifier": "http:default",
-      "allow": [
-        { "url": "https://ark.cn-beijing.volces.com/*" },
-        { "url": "https://*.tos-cn-beijing.volces.com/*" }
-      ]
-    },
-    {
-      "identifier": "opener:allow-open-url",
-      "allow": [
-        { "url": "https://www.volcengine.com" },
-        { "url": "https://www.volcengine.com/*" },
-        { "url": "https://console.volcengine.com" },
-        { "url": "https://console.volcengine.com/*" }
-      ]
-    },
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
     "fs:allow-mkdir",

@@ -17,17 +17,13 @@ export interface PlantChatMessage {
   role: 'user' | 'assistant'
   text: string
   hasImage?: boolean
-  imagePreviewUrl?: string
+  errorMessage?: string
+  plan?: PlantPlan
+  needsClarification?: boolean
   status: 'done' | 'pending' | 'error'
 }
 
-export interface PlantPlanReply {
-  reply: string
-  needsClarification: boolean
-  plan: PlantPlan | null
-}
-
-export function validateGrowthDescriptions(value: unknown): GrowthDescriptions {
+function validateGrowthDescriptions(value: unknown): GrowthDescriptions {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('请补齐三个成长阶段的形态描述。')
   const descriptions = value as Record<string, unknown>
@@ -64,15 +60,4 @@ export function validatePlantPlan(value: unknown): PlantPlan {
     states,
     careProfile: validateCareProfile(obj.careProfile),
   }
-}
-
-export function validatePlantPlanReply(value: unknown): PlantPlanReply {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('AI 回复格式不合法。')
-  const obj = value as Record<string, unknown>
-  const reply = readText(obj.reply, 'AI 回复', 1600)
-  if (typeof obj.needsClarification !== 'boolean')
-    throw new Error('AI 未说明档案是否已明确。')
-  if (obj.needsClarification) return { reply, needsClarification: true, plan: null }
-  return { reply, needsClarification: false, plan: validatePlantPlan(obj.plan) }
 }
