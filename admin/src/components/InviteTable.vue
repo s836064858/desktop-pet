@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ElButton, ElMessage, ElPopconfirm, ElTable, ElTableColumn, ElTag } from 'element-plus'
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import type { Invite } from '../api/ai-admin'
 import { useAdminAction } from '../composables/use-admin-action'
 import { formatInviteDate } from '../lib/format-invite-date'
+import { formatUsageCost } from '../lib/format-usage-cost'
 
 const props = defineProps<{ rows: Invite[]; batchIds: string[]; canEdit: boolean; isPending: boolean }>()
 const emit = defineEmits<{
@@ -60,6 +62,18 @@ function toggleUserAi(invite: Invite): void {
     <ElTableColumn label="用户昵称" min-width="130" show-overflow-tooltip>
       <template #default="{ row }">{{ row.nickname ?? '—' }}</template>
     </ElTableColumn>
+    <ElTableColumn label="总用量" min-width="170">
+      <template #default="{ row }">
+        <div v-if="row.userId" class="invite-usage">
+          <span>{{ row.totalRequests }} 次<template v-if="row.totalRequests > 0"> · {{ formatUsageCost(row.totalCost) }}</template></span>
+          <RouterLink
+            class="usage-detail"
+            :to="{ name: 'usage', query: { userId: row.userId, nickname: row.nickname ?? '' } }"
+          >详细</RouterLink>
+        </div>
+        <span v-else>—</span>
+      </template>
+    </ElTableColumn>
     <ElTableColumn label="邀请状态" min-width="100">
       <template #default="{ row }"><ElTag disable-transitions size="small" :type="row.redeemedAt && !row.revokedAt ? 'success' : 'info'">{{ state(row as Invite) }}</ElTag></template>
     </ElTableColumn>
@@ -108,9 +122,12 @@ function toggleUserAi(invite: Invite): void {
 </template>
 
 <style scoped>
-.invite-code, .invite-note { display: flex; align-items: center; gap: 0.65rem; }
+.invite-code, .invite-note, .invite-usage { display: flex; align-items: center; gap: 0.65rem; }
 .invite-code code { font-family: ui-monospace, monospace; font-size: 0.8rem; user-select: all; }
-.invite-note span { min-width: 0; overflow-wrap: anywhere; }
+.invite-note span, .invite-usage span { min-width: 0; overflow-wrap: anywhere; }
+.invite-usage span { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.usage-detail { color: var(--el-color-primary); text-decoration: none; white-space: nowrap; }
+.usage-detail:hover { text-decoration: underline; }
 .unavailable-code { color: var(--color-muted); font-size: 0.8rem; }
 .copy-error { margin: 0.6rem 1rem; }
 </style>

@@ -71,7 +71,8 @@ export class AiAdminController {
   }
 
   @Get('usage')
-  report(@Query('days') days?: string, @Query('result') result?: string, @Query('type') type?: string) {
-    return this.usage.report({ days, result, type })
+  report(@Query('days') days?: string, @Query('result') result?: string, @Query('type') type?: string,
+    @Query('userId') userId?: string) {
+    return this.usage.report({ days, result, type, userId })
   }
 }

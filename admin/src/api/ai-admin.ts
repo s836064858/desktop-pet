@@ -12,6 +12,8 @@ export interface Invite {
   expiresAt: string | null
   redeemedAt: string | null
   revokedAt: string | null
+  totalRequests: number
+  totalCost: number | null
 }
 export interface IssueInvitesInput {
   count: number

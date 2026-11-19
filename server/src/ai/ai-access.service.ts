@@ -4,6 +4,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/prom
 import { DatabaseService } from '../database/database.service'
 import { decryptConfig, encryptConfig } from '../tos-storage/tos-credentials'
 import { record, text, uuid } from './ai-input'
+import { usageCostParams, usageCostSql } from './ai-pricing'
 
 interface InviteRow extends RowDataPacket {
   id: string
@@ -29,6 +30,8 @@ interface InviteListRow extends RowDataPacket {
   isAiDisabled: number | null
   codeCipher: Buffer | null
   expiresAt: Date | null
+  totalRequests: number | null
+  totalCost: string | null
 }
 
 const inviteFields = `id, label, user_id AS userId, expires_at AS expiresAt,
@@ -71,13 +74,19 @@ export class AiAccessService {
       invite.created_at AS createdAt, invite.redeemed_at AS redeemedAt,
       CASE WHEN invite.redeemed_at IS NULL THEN invite.expires_at ELSE NULL END AS expiresAt,
       invite.revoked_at AS revokedAt, identity.label AS nickname, identity.is_ai_disabled AS isAiDisabled,
-      identity.revoked_at AS userRevokedAt, ${canReadCodes ? 'invite.code_cipher' : 'NULL'} AS codeCipher
+      identity.revoked_at AS userRevokedAt, ${canReadCodes ? 'invite.code_cipher' : 'NULL'} AS codeCipher,
+      usage_stats.totalRequests, usage_stats.totalCost
       FROM ai_invites AS invite LEFT JOIN ai_users AS identity ON identity.id = invite.user_id
-      ORDER BY invite.created_at DESC, invite.id DESC LIMIT 200`)
-    return rows.map(({ codeCipher, ...row }) => ({
+      LEFT JOIN (SELECT user_id, COUNT(*) AS totalRequests, SUM(cost) AS totalCost
+        FROM (SELECT ai_usage.*, ${usageCostSql} AS cost FROM ai_usage) AS priced GROUP BY user_id) AS usage_stats
+        ON usage_stats.user_id = invite.user_id
+      ORDER BY invite.created_at DESC, invite.id DESC LIMIT 200`, [...usageCostParams])
+    return rows.map(({ codeCipher, totalRequests, totalCost, ...row }) => ({
       ...row,
       code: codeCipher ? decryptConfig<{ code: string }>(codeCipher, inviteContext(row.id)).code : null,
       isAiDisabled: row.isAiDisabled === null ? null : Boolean(row.isAiDisabled),
+      totalRequests: totalRequests ?? 0,
+      totalCost: totalCost == null ? null : Number(totalCost),
     }))
   }
 

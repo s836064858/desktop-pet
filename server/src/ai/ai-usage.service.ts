@@ -1,21 +1,24 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import type { RowDataPacket } from 'mysql2/promise'
 import { DatabaseService } from '../database/database.service'
+import { uuid } from './ai-input'
 import { generatedImagesSql, modelPricing, usageCostParams, usageCostSql } from './ai-pricing'
 
 @Injectable()
 export class AiUsageService {
   constructor(private readonly database: DatabaseService) {}
 
-  async report(options: { days?: string; result?: string; type?: string }) {
+  async report(options: { days?: string; result?: string; type?: string; userId?: string }) {
     const days = Number(options.days ?? 7)
     const { result, type } = options
     if (![7, 14, 30].includes(days) || (result && !['running', 'success', 'failed', 'unknown'].includes(result)) ||
       (type && !['chat', 'image'].includes(type))) throw new BadRequestException('用量筛选无效。')
+    const userId = options.userId ? uuid(options.userId) : null
     const values = [days - 1]
     const where = `started_at >= UTC_DATE() - INTERVAL ? DAY
-      ${result ? 'AND result = ?' : ''} ${type ? 'AND type = ?' : ''}`
-    const args = [...usageCostParams, ...values, ...(result ? [result] : []), ...(type ? [type] : [])]
+      ${result ? 'AND result = ?' : ''} ${type ? 'AND type = ?' : ''} ${userId ? 'AND user_id = ?' : ''}`
+    const args = [...usageCostParams, ...values, ...(result ? [result] : []), ...(type ? [type] : []),
+      ...(userId ? [userId] : [])]
     const pricedCalls = `SELECT ai_usage.*, ${usageCostSql} AS cost,
       ${generatedImagesSql} AS images FROM ai_usage WHERE ${where}`
     const [trend, calls] = await Promise.all([

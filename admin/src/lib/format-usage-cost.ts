@@ -1,7 +1,7 @@
 const yuan = new Intl.NumberFormat('zh-CN', {
   style: 'currency',
   currency: 'CNY',
-  maximumFractionDigits: 8,
+  maximumFractionDigits: 3,
 })
 
 export function usageNumber(value: unknown): number {
